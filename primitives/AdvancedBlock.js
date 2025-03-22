@@ -163,8 +163,7 @@ PRIMITIVES["block_advanced"] = {
                     "thirdperson": {
                         "rotation": [10, -45, 170],
                         "translation": [0, 1.5, -2.75],
-                        "scale": [1, 1, 1] 
-// set this back to 0.375 if it does not work
+                        "scale": [0.375, 0.375, 0.375] 
                     }
                 }
             }
