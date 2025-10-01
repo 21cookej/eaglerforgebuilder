@@ -5,441 +5,104 @@ PRIMITIVES["mob"] = {
     tags: {
         id: "custom_mob",
         name: "Custom Mob",
-        texture: VALUE_ENUMS.IMG,
-        modelType: ["CHICKEN", "PIG", "COW", "SHEEP", "WOLF", "ZOMBIE", "SKELETON", "SPIDER"],
-        width: 0.4,
-        height: 0.7,
-        shadowSize: 0.3,
-        maxHealth: 10,
-        movementSpeed: 0.25,
-        swimSpeed: 1.4,
-        canSwim: true,
-        canPanic: true,
-        panicSpeed: 1.4,
-        canMate: true,
-        mateSpeed: 1.0,
-        canFollowParent: true,
-        followParentSpeed: 1.2,
-        canWander: true,
-        wanderSpeed: 1.0,
-        canWatchPlayer: true,
-        watchDistance: 6.0,
-        breedingItem: "wheat",
-        dropItem: "leather",
-        spawnEggBaseColor: 0x5e3e2d,
-        spawnEggSpotColor: 0x269166,
-        spawnInBiomes: ["plains", "forest", "swampland", "river", "beach"],
-        spawnWeight: 10,
-        spawnMinGroup: 2,
-        spawnMaxGroup: 4,
-        livingSound: "mob.custom.idle",
-        hurtSound: "mob.custom.hurt",
-        deathSound: "mob.custom.death",
-        stepSound: "mob.custom.step",
-        stepVolume: 0.15,
-        idleAudioFile: VALUE_ENUMS.AUDIO,
-        hurtAudioFile: VALUE_ENUMS.AUDIO,
-        deathAudioFile: VALUE_ENUMS.AUDIO,
-        stepAudioFile: VALUE_ENUMS.AUDIO,
+        baseClass: "EntityAnimal", // EntityAnimal, EntityMob, etc.
+        size: [0.6, 1.8],
+        health: 20,
+        speed: 0.25,
+        ai: [
+            { type: "swimming" },
+            { type: "wander", speed: 1.0 },
+            { type: "watchClosest", target: "EntityPlayer", range: 6 },
+            { type: "lookIdle" }
+        ],
+        sounds: {
+            living: "mob.cow.say",
+            hurt: "mob.cow.hurt",
+            death: "mob.cow.death",
+            step: "mob.cow.step"
+        },
         Constructor: VALUE_ENUMS.ABSTRACT_HANDLER + "MobConstructor",
-        LivingUpdate: VALUE_ENUMS.ABSTRACT_HANDLER + "MobLivingUpdate",
-        OnInteract: VALUE_ENUMS.ABSTRACT_HANDLER + "MobInteract",
-        GetEyeHeight: VALUE_ENUMS.ABSTRACT_HANDLER + "MobEyeHeight",
+        Tick: VALUE_ENUMS.ABSTRACT_HANDLER + "MobTick",
+        OnDeath: VALUE_ENUMS.ABSTRACT_HANDLER + "MobDeath"
     },
     getDependencies: function () {
         return [];
     },
     asJavaScript: function () {
-        var constructorHandler = getHandlerCode("MobConstructor", this.tags.Constructor, ["$$entity"]);
-        var livingUpdateHandler = getHandlerCode("MobLivingUpdate", this.tags.LivingUpdate, ["$$entity"]);
-        var interactHandler = getHandlerCode("MobInteract", this.tags.OnInteract, ["$$entity", "$$player"], {
-            "1_8": function (argNames, code) {
-                return `
-                nme_CustomEntity.prototype.$interact = function (${argNames[1]}) {
-                    this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
-                    var ${argNames[0]} = this.wrapped;
-                    var ${argNames[1]} = ModAPI.util.wrap(${argNames[1]});
-                    ${code};
-                    return 0;
+        const t = this.tags;
+        const mobId = t.id;
+
+        var constructorHandler = getHandlerCode("MobConstructor", this.tags.Constructor, ["$$world"]);
+        var tickHandler = getHandlerCode("MobTick", this.tags.Tick, ["$$world"]);
+        var deathHandler = getHandlerCode("MobDeath", this.tags.OnDeath, ["$$damageSource"]);
+
+        // AI generator
+        function buildAI(ai) {
+            return ai.map((task, i) => {
+                switch(task.type) {
+                    case "swimming": return `this.wrapped.tasks.addTask(${i}, AITask("EntityAISwimming", 1)(this));`;
+                    case "wander": return `this.wrapped.tasks.addTask(${i}, AITask("EntityAIWander", 2)(this, ${task.speed||1.0}));`;
+                    case "watchClosest": return `this.wrapped.tasks.addTask(${i}, AITask("EntityAIWatchClosest", 3)(this, ModAPI.util.asClass(EntityPlayer.class), ${task.range||6}));`;
+                    case "lookIdle": return `this.wrapped.tasks.addTask(${i}, AITask("EntityAILookIdle", 1)(this));`;
+                    default: return `// Unknown AI: ${JSON.stringify(task)}`;
                 }
-                `
-            },
-            "1_12": function (argNames, code) {
-                return `
-                var $$EnumHand = ModAPI.reflect.getClassById("net.minecraft.util.EnumHand").staticVariables;
-                nme_CustomEntity.prototype.$processInteract = function (${argNames[1]}, $handEnum) {
-                    this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
-                    var ${argNames[0]} = this.wrapped;
-                    var ${argNames[1]} = ModAPI.util.wrap(${argNames[1]});
-                    ${code};
-                    return 0;
-                }
-                `
-            }
-        });
-        var eyeHeightHandler = getHandlerCode("MobEyeHeight", this.tags.GetEyeHeight, ["$$entity"]);
-
-        const biomeMapping = {
-            "plains": "plains",
-            "desert": "desert",
-            "extremeHills": "extremeHills",
-            "forest": "forest",
-            "taiga": "taiga",
-            "swampland": "swampland",
-            "river": "river",
-            "hell": "hell",
-            "sky": "sky",
-            "ocean": "ocean",
-            "frozenOcean": "frozenOcean",
-            "frozenRiver": "frozenRiver",
-            "icePlains": "icePlains",
-            "iceMountains": "iceMountains",
-            "mushroomIsland": "mushroomIsland",
-            "mushroomIslandShore": "mushroomIslandShore",
-            "beach": "beach",
-            "desertHills": "desertHills",
-            "forestHills": "forestHills",
-            "taigaHills": "taigaHills",
-            "extremeHillsEdge": "extremeHillsEdge",
-            "jungle": "jungle",
-            "jungleHills": "jungleHills",
-            "jungleEdge": "jungleEdge",
-            "deepOcean": "deepOcean",
-            "stoneBeach": "stoneBeach",
-            "coldBeach": "coldBeach",
-            "birchForest": "birchForest",
-            "birchForestHills": "birchForestHills",
-            "roofedForest": "roofedForest",
-            "coldTaiga": "coldTaiga",
-            "coldTaigaHills": "coldTaigaHills",
-            "megaTaiga": "megaTaiga",
-            "megaTaigaHills": "megaTaigaHills",
-            "extremeHillsPlus": "extremeHillsPlus",
-            "savanna": "savanna",
-            "savannaPlateau": "savannaPlateau",
-            "mesa": "mesa",
-            "mesaPlateau_F": "mesaPlateau_F",
-            "mesaPlateau": "mesaPlateau"
-        };
-
-        const modelMapping = {
-            "CHICKEN": "net.minecraft.client.model.ModelChicken",
-            "PIG": "net.minecraft.client.model.ModelPig",
-            "COW": "net.minecraft.client.model.ModelCow",
-            "SHEEP": "net.minecraft.client.model.ModelSheep1",
-            "WOLF": "net.minecraft.client.model.ModelWolf",
-            "ZOMBIE": "net.minecraft.client.model.ModelZombie",
-            "SKELETON": "net.minecraft.client.model.ModelSkeleton",
-            "SPIDER": "net.minecraft.client.model.ModelSpider"
-        };
-
-        // Check if texture is defined
-        const hasTexture = this.tags.texture && this.tags.texture !== VALUE_ENUMS.IMG && this.tags.texture.length > 0;
-        
-        // Check if audio files are defined
-        const hasIdleAudio = this.tags.idleAudioFile && this.tags.idleAudioFile !== VALUE_ENUMS.AUDIO && this.tags.idleAudioFile.length > 0;
-        const hasHurtAudio = this.tags.hurtAudioFile && this.tags.hurtAudioFile !== VALUE_ENUMS.AUDIO && this.tags.hurtAudioFile.length > 0;
-        const hasDeathAudio = this.tags.deathAudioFile && this.tags.deathAudioFile !== VALUE_ENUMS.AUDIO && this.tags.deathAudioFile.length > 0;
-        const hasStepAudio = this.tags.stepAudioFile && this.tags.stepAudioFile !== VALUE_ENUMS.AUDIO && this.tags.stepAudioFile.length > 0;
-
-        return `(function CustomMobEntity() {
-    ModAPI.meta.title("${this.tags.name} Mod");
-    ModAPI.meta.description("Adds ${this.tags.name} to the game");
-
-    function waitForRenderManager() {
-        return new Promise((res, rej)=>{
-            function check() {
-                if (ModAPI.mc.renderManager) {
-                    res();
-                } else {
-                    setTimeout(check, 1/20);
-                }
-            }
-            check();
-        });
-    }
-
-    function registerEntity() {
-        ModAPI.hooks.methods.jl_String_format = ModAPI.hooks.methods.nlev_HString_format;
-        
-        // Utils
-        function AITask(name, length) {
-            return ModAPI.reflect.getClassById("net.minecraft.entity.ai." + name).constructors.find(x => x.length === length);
+            }).join("\n");
         }
-        const ResourceLocation = ModAPI.reflect.getClassByName("ResourceLocation").constructors.find(x => x.length === 1);
-        const EntityPlayer = ModAPI.reflect.getClassByName("EntityPlayer");
-        const SharedMonsterAttributes = ModAPI.reflect.getClassByName("SharedMonsterAttributes").staticVariables;
 
-        // START CUSTOM ENTITY
-        var entityClass = ModAPI.reflect.getClassById("net.minecraft.entity.passive.EntityAnimal");
+        return `(function MobDatablock() {
+    function $$ServersideMob() {
+        var entityClass = ModAPI.reflect.getClassById("net.minecraft.entity.passive.${t.baseClass}");
         var entitySuper = ModAPI.reflect.getSuper(entityClass, (x) => x.length === 2);
-        
-        var nme_CustomEntity = function nme_CustomEntity($worldIn) {
-            entitySuper(this, $worldIn);
-            this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
-            this.wrapped.setSize(${this.tags.width}, ${this.tags.height});
-            
-            var taskId = 0;
-            ${this.tags.canSwim ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAISwimming", 1)(this));` : ''}
-            ${this.tags.canPanic ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIPanic", 2)(this, ${this.tags.panicSpeed}));` : ''}
-            ${this.tags.canMate ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIMate", 2)(this, ${this.tags.mateSpeed}));` : ''}
-            this.wrapped.tasks.addTask(taskId++, AITask("EntityAITempt", 4)(this, 1.5, ModAPI.items["${this.tags.breedingItem}"]?.getRef() || ModAPI.items.wheat.getRef(), 0));
-            ${this.tags.canFollowParent ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIFollowParent", 2)(this, ${this.tags.followParentSpeed}));` : ''}
-            ${this.tags.canWander ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIWander", 2)(this, ${this.tags.wanderSpeed}));` : ''}
-            ${this.tags.canWatchPlayer ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIWatchClosest", 3)(this, ModAPI.util.asClass(EntityPlayer.class), ${this.tags.watchDistance}));` : ''}
-            this.wrapped.tasks.addTask(taskId++, AITask("EntityAILookIdle", 1)(this));
-            
-            var $$entity = this.wrapped;
-            ${constructorHandler.code};
-        }
-        
-        ModAPI.reflect.prototypeStack(entityClass, nme_CustomEntity);
-        
-        nme_CustomEntity.prototype.$getEyeHeight = function () {
-            this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
-            var $$entity = this.wrapped;
-            ${eyeHeightHandler.code || `return this.wrapped.height;`}
-        }
+        const SharedMonsterAttributes = ModAPI.reflect.getClassByName("SharedMonsterAttributes").staticVariables;
+        const EntityPlayer = ModAPI.reflect.getClassByName("EntityPlayer");
 
-        const originalApplyEntityAttributes = nme_CustomEntity.prototype.$applyEntityAttributes;
-        nme_CustomEntity.prototype.$applyEntityAttributes = function () {
+        function $$CustomMob($$world) {
+            entitySuper(this, $$world);
+            this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
+            this.wrapped.setSize(${t.size[0]}, ${t.size[1]});
+            ${constructorHandler.code};
+            ${buildAI(t.ai)}
+        }
+        ModAPI.reflect.prototypeStack(entityClass, $$CustomMob);
+
+        // Attributes
+        const originalApplyEntityAttributes = $$CustomMob.prototype.$applyEntityAttributes;
+        $$CustomMob.prototype.$applyEntityAttributes = function () {
             this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
             originalApplyEntityAttributes.apply(this, []);
-            this.wrapped.getEntityAttribute(SharedMonsterAttributes.maxHealth).setBaseValue(${this.tags.maxHealth});
-            this.wrapped.getEntityAttribute(SharedMonsterAttributes.movementSpeed).setBaseValue(${this.tags.movementSpeed});
+            this.wrapped.getEntityAttribute(SharedMonsterAttributes.maxHealth).setBaseValue(${t.health});
+            this.wrapped.getEntityAttribute(SharedMonsterAttributes.movementSpeed).setBaseValue(${t.speed});
         }
 
-        const originalLivingUpdate = nme_CustomEntity.prototype.$onLivingUpdate;
-        nme_CustomEntity.prototype.$onLivingUpdate = function () {
+        // Tick handler
+        const originalLivingUpdate = $$CustomMob.prototype.$onLivingUpdate;
+        $$CustomMob.prototype.$onLivingUpdate = function () {
             this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
             originalLivingUpdate.apply(this, []);
-            ${this.tags.canSwim ? `
-            if (this.wrapped.isInWater()) {
-                this.wrapped.motionY *= 0.5;
-                this.wrapped.getEntityAttribute(SharedMonsterAttributes.movementSpeed).setBaseValue(${this.tags.swimSpeed});
-            } else {
-                this.wrapped.getEntityAttribute(SharedMonsterAttributes.movementSpeed).setBaseValue(${this.tags.movementSpeed});
-            }
-            ` : ''}
-            var $$entity = this.wrapped;
-            ${livingUpdateHandler.code};
+            ${tickHandler.code};
         }
 
-        ${interactHandler}
+        // Death handler
+        const originalOnDeath = $$CustomMob.prototype.$onDeath;
+        $$CustomMob.prototype.$onDeath = function (${deathHandler.args.join(", ")}) {
+            originalOnDeath.apply(this, [${deathHandler.args.join(", ")}]);
+            ${deathHandler.code};
+        }
 
-        nme_CustomEntity.prototype.$getLivingSound = function () {
-            return ModAPI.util.str("${this.tags.livingSound}");
-        }
-        nme_CustomEntity.prototype.$getHurtSound = function () {
-            return ModAPI.util.str("${this.tags.hurtSound}");
-        }
-        nme_CustomEntity.prototype.$getDeathSound = function () {
-            return ModAPI.util.str("${this.tags.deathSound}");
-        }
-        nme_CustomEntity.prototype.$playStepSound = function () {
+        // Sounds
+        $$CustomMob.prototype.$getLivingSound = function () { return ModAPI.util.str("${t.sounds.living}"); }
+        $$CustomMob.prototype.$getHurtSound = function () { return ModAPI.util.str("${t.sounds.hurt}"); }
+        $$CustomMob.prototype.$getDeathSound = function () { return ModAPI.util.str("${t.sounds.death}"); }
+        $$CustomMob.prototype.$playStepSound = function () {
             this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
-            this.wrapped.playSound(ModAPI.util.str("${this.tags.stepSound}"), ${this.tags.stepVolume}, 1);
+            this.wrapped.playSound(ModAPI.util.str("${t.sounds.step}"), 0.2, 1);
         }
-        nme_CustomEntity.prototype.$getDropItem = function () {
-            return ModAPI.items["${this.tags.dropItem}"]?.getRef() || ModAPI.items.leather.getRef();
-        }
-        nme_CustomEntity.prototype.$createChild = function (otherParent) {
-            this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
-            return new nme_CustomEntity(this.wrapped.worldObj?.getRef() ?? null);
-        }
-        nme_CustomEntity.prototype.$isBreedingItem = function (itemstack) {
-            var breedItem = ModAPI.items["${this.tags.breedingItem}"]?.getRef() || ModAPI.items.wheat.getRef();
-            return itemstack !== null && itemstack.$getItem() === breedItem;
-        }
-        // END CUSTOM ENTITY
 
-        // START CUSTOM MODEL
-        var modelClass = ModAPI.reflect.getClassById("${modelMapping[this.tags.modelType]}");
-        var modelSuper = ModAPI.reflect.getSuper(modelClass);
-        
-        var nmcm_CustomModel = function nmcm_CustomModel() {
-            modelSuper(this);
-        }
-        ModAPI.reflect.prototypeStack(modelClass, nmcm_CustomModel);
-        // END CUSTOM MODEL
-
-        // START CUSTOM RENDERER
-        var renderClass = ModAPI.reflect.getClassById("net.minecraft.client.renderer.entity.RenderLiving");
-        var renderSuper = ModAPI.reflect.getSuper(renderClass, (x) => x.length === 4);
-        const mobTextures = ResourceLocation(ModAPI.util.str("textures/entity/${this.tags.id}.png"));
-        
-        var nmcre_CustomRender = function nmcre_CustomRender(renderManager, modelBaseIn, shadowSizeIn) {
-            renderSuper(this, renderManager, modelBaseIn, shadowSizeIn);
-        }
-        ModAPI.reflect.prototypeStack(renderClass, nmcre_CustomRender);
-        
-        nmcre_CustomRender.prototype.$getEntityTexture = function (entity) {
-            return mobTextures;
-        }
-        ${flags.target === "1_12" ? `
-        nmcre_CustomRender.prototype.$handleRotationFloat = function (entity, partialTicks) {
-            entity = ModAPI.util.wrap(entity);
-            if ((!entity.onGround) && (!entity.isInWater())) {
-                return 2;
-            } else {
-                return 0;
-            }
-        }
-        ` : `
-        nmcre_CustomRender.prototype.$func_77044_a = function (entity, partialTicks) {
-            entity = ModAPI.util.wrap(entity);
-            if ((!entity.onGround) && (!entity.isInWater())) {
-                return 2;
-            } else {
-                return 0;
-            }
-        }
-        `}
-        // END CUSTOM RENDERER
-
-        const ID = ModAPI.keygen.entity("${this.tags.id}");
-        ModAPI.reflect.getClassById("net.minecraft.entity.EntityList").staticMethods.addMapping0.method(
-            ModAPI.util.asClass(nme_CustomEntity),
-            {
-                $createEntity: function ($worldIn) {
-                    return new nme_CustomEntity($worldIn);
-                }
-            },
-            ModAPI.util.str("${this.tags.name}"),
-            ID,
-            ${this.tags.spawnEggBaseColor},
-            ${this.tags.spawnEggSpotColor}
-        );
-
-        const SpawnPlacementType = ModAPI.reflect.getClassById("net.minecraft.entity.EntityLiving$SpawnPlacementType").staticVariables;
-        const ENTITY_PLACEMENTS = ModAPI.util.wrap(
-            ModAPI.reflect.getClassById("net.minecraft.entity.EntitySpawnPlacementRegistry")
-                .staticVariables.ENTITY_PLACEMENTS
-        );
-        ENTITY_PLACEMENTS.put(ModAPI.util.asClass(nme_CustomEntity), SpawnPlacementType.ON_GROUND);
-        
-        ModAPI.addEventListener('bootstrap', ()=>{
-            const SpawnListEntry = ModAPI.reflect
-                .getClassById("net.minecraft.world.biome.BiomeGenBase$SpawnListEntry")
-                .constructors.find(x => x.length === 4);
-            
-            ${this.tags.spawnInBiomes.map(biome => `
-            const Biome_${biome} = ModAPI.util.wrap(
-                ModAPI.reflect.getClassById("net.minecraft.world.biome.BiomeGenBase")
-                    .staticVariables.${biomeMapping[biome]}
-            );
-            const spawnEntry_${biome} = SpawnListEntry(
-                ModAPI.util.asClass(nme_CustomEntity), 
-                ${this.tags.spawnWeight}, 
-                ${this.tags.spawnMinGroup}, 
-                ${this.tags.spawnMaxGroup}
-            );
-            Biome_${biome}.spawnableCreatureList.add(spawnEntry_${biome});
-            `).join('\n')}
-        });
-
-        ModAPI.addEventListener("lib:asyncsink", async () => {
-            AsyncSink.L10N.set("entity.${this.tags.name}.name", "${this.tags.name}");
-        });
-
-        return {
-            EntityCustom: nme_CustomEntity,
-            ModelCustom: nmcm_CustomModel,
-            RenderCustom: nmcre_CustomRender,
-            mobTextures: mobTextures
-        }
+        // TODO: Register mob properly with ModAPI.entities
     }
 
-    ModAPI.dedicatedServer.appendCode(registerEntity);
-    var data = registerEntity();
-
-    ModAPI.addEventListener("lib:asyncsink", async () => {
-        ${hasTexture ? `
-        try {
-            AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/entity/${this.tags.id}.png", await (await fetch(
-                "${this.tags.texture}"
-            )).arrayBuffer());
-            AsyncSink.hideFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/entity/${this.tags.id}.png.mcmeta");
-        } catch(e) {
-            console.warn("Failed to load mob texture:", e);
-        }
-        ` : ''}
-
-        await waitForRenderManager();
-
-        ${hasIdleAudio ? `
-        try {
-            AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/idle.ogg", await (await fetch(
-                "${this.tags.idleAudioFile}"
-            )).arrayBuffer());
-            AsyncSink.Audio.register("${this.tags.livingSound}", AsyncSink.Audio.Category.ANIMALS, [{
-                path: "sounds/mob/${this.tags.id}/idle.ogg",
-                pitch: 1,
-                volume: 1,
-                streaming: false
-            }]);
-        } catch(e) {
-            console.warn("Failed to load idle sound:", e);
-        }
-        ` : ''}
-
-        ${hasHurtAudio ? `
-        try {
-            AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/hurt.ogg", await (await fetch(
-                "${this.tags.hurtAudioFile}"
-            )).arrayBuffer());
-            AsyncSink.Audio.register("${this.tags.hurtSound}", AsyncSink.Audio.Category.ANIMALS, [{
-                path: "sounds/mob/${this.tags.id}/hurt.ogg",
-                pitch: 1,
-                volume: 1,
-                streaming: false
-            }]);
-        } catch(e) {
-            console.warn("Failed to load hurt sound:", e);
-        }
-        ` : ''}
-
-        ${hasDeathAudio ? `
-        try {
-            AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/death.ogg", await (await fetch(
-                "${this.tags.deathAudioFile}"
-            )).arrayBuffer());
-            AsyncSink.Audio.register("${this.tags.deathSound}", AsyncSink.Audio.Category.ANIMALS, [{
-                path: "sounds/mob/${this.tags.id}/death.ogg",
-                pitch: 1,
-                volume: 1,
-                streaming: false
-            }]);
-        } catch(e) {
-            console.warn("Failed to load death sound:", e);
-        }
-        ` : ''}
-
-        ${hasStepAudio ? `
-        try {
-            AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/step.ogg", await (await fetch(
-                "${this.tags.stepAudioFile}"
-            )).arrayBuffer());
-            AsyncSink.Audio.register("${this.tags.stepSound}", AsyncSink.Audio.Category.ANIMALS, [{
-                path: "sounds/mob/${this.tags.id}/step.ogg",
-                pitch: 1,
-                volume: 1,
-                streaming: false
-            }]);
-        } catch(e) {
-            console.warn("Failed to load step sound:", e);
-        }
-        ` : ''}
-
-        try {
-            ModAPI.mc.renderManager.entityRenderMap.put(ModAPI.util.asClass(data.EntityCustom), new data.RenderCustom(ModAPI.mc.renderManager.getRef(), new data.ModelCustom(), ${this.tags.shadowSize}));
-            ModAPI.promisify(ModAPI.mc.renderEngine.bindTexture)(data.mobTextures).then(() => {
-                console.log("Loaded ${this.tags.name} texture into cache.");
-            });
-        } catch(e) {
-            console.warn("Failed to register renderer:", e);
-        }
-    });
-})();`
+    ModAPI.dedicatedServer.appendCode($$ServersideMob); 
+    $$ServersideMob();
+})();`;
     }
-}
+};
