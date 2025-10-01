@@ -5,104 +5,95 @@ PRIMITIVES["mob"] = {
     tags: {
         id: "custom_mob",
         name: "Custom Mob",
-        baseClass: "EntityAnimal", // EntityAnimal, EntityMob, etc.
-        size: [0.6, 1.8],
         health: 20,
-        speed: 0.25,
-        ai: [
-            { type: "swimming" },
-            { type: "wander", speed: 1.0 },
-            { type: "watchClosest", target: "EntityPlayer", range: 6 },
-            { type: "lookIdle" }
-        ],
-        sounds: {
-            living: "mob.cow.say",
-            hurt: "mob.cow.hurt",
-            death: "mob.cow.death",
-            step: "mob.cow.step"
-        },
+        width: 0.6,
+        height: 1.8,
+        trackingRange: 64,
+        eggPrimary: "#00FF00",
+        eggSecondary: "#000000",
+        texture: VALUE_ENUMS.IMG,
+        AI: [],
         Constructor: VALUE_ENUMS.ABSTRACT_HANDLER + "MobConstructor",
         Tick: VALUE_ENUMS.ABSTRACT_HANDLER + "MobTick",
-        OnDeath: VALUE_ENUMS.ABSTRACT_HANDLER + "MobDeath"
+        Interact: VALUE_ENUMS.ABSTRACT_HANDLER + "MobInteract",
+        Attack: VALUE_ENUMS.ABSTRACT_HANDLER + "MobAttack",
+        Death: VALUE_ENUMS.ABSTRACT_HANDLER + "MobDeath",
     },
     getDependencies: function () {
         return [];
     },
     asJavaScript: function () {
-        const t = this.tags;
-        const mobId = t.id;
+        return `
+(function MobDatablock() {
+    // ===== ENTITY CLASS =====
+    function $$CustomMob(world) {
+        var $$EntityLiving = ModAPI.reflect.getClassById("net.minecraft.entity.EntityLiving");
+        var $$EntitySuper = ModAPI.reflect.getSuper($$EntityLiving, (x)=>x.length===1);
+        $$EntitySuper(this, world);
 
-        var constructorHandler = getHandlerCode("MobConstructor", this.tags.Constructor, ["$$world"]);
-        var tickHandler = getHandlerCode("MobTick", this.tags.Tick, ["$$world"]);
-        var deathHandler = getHandlerCode("MobDeath", this.tags.OnDeath, ["$$damageSource"]);
+        this.$setSize(${this.tags.width}, ${this.tags.height});
+        this.$setHealth(${this.tags.health});
 
-        // AI generator
-        function buildAI(ai) {
-            return ai.map((task, i) => {
-                switch(task.type) {
-                    case "swimming": return `this.wrapped.tasks.addTask(${i}, AITask("EntityAISwimming", 1)(this));`;
-                    case "wander": return `this.wrapped.tasks.addTask(${i}, AITask("EntityAIWander", 2)(this, ${task.speed||1.0}));`;
-                    case "watchClosest": return `this.wrapped.tasks.addTask(${i}, AITask("EntityAIWatchClosest", 3)(this, ModAPI.util.asClass(EntityPlayer.class), ${task.range||6}));`;
-                    case "lookIdle": return `this.wrapped.tasks.addTask(${i}, AITask("EntityAILookIdle", 1)(this));`;
-                    default: return `// Unknown AI: ${JSON.stringify(task)}`;
-                }
-            }).join("\n");
-        }
-
-        return `(function MobDatablock() {
-    function $$ServersideMob() {
-        var entityClass = ModAPI.reflect.getClassById("net.minecraft.entity.passive.${t.baseClass}");
-        var entitySuper = ModAPI.reflect.getSuper(entityClass, (x) => x.length === 2);
-        const SharedMonsterAttributes = ModAPI.reflect.getClassByName("SharedMonsterAttributes").staticVariables;
-        const EntityPlayer = ModAPI.reflect.getClassByName("EntityPlayer");
-
-        function $$CustomMob($$world) {
-            entitySuper(this, $$world);
-            this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
-            this.wrapped.setSize(${t.size[0]}, ${t.size[1]});
-            ${constructorHandler.code};
-            ${buildAI(t.ai)}
-        }
-        ModAPI.reflect.prototypeStack(entityClass, $$CustomMob);
-
-        // Attributes
-        const originalApplyEntityAttributes = $$CustomMob.prototype.$applyEntityAttributes;
-        $$CustomMob.prototype.$applyEntityAttributes = function () {
-            this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
-            originalApplyEntityAttributes.apply(this, []);
-            this.wrapped.getEntityAttribute(SharedMonsterAttributes.maxHealth).setBaseValue(${t.health});
-            this.wrapped.getEntityAttribute(SharedMonsterAttributes.movementSpeed).setBaseValue(${t.speed});
-        }
-
-        // Tick handler
-        const originalLivingUpdate = $$CustomMob.prototype.$onLivingUpdate;
-        $$CustomMob.prototype.$onLivingUpdate = function () {
-            this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
-            originalLivingUpdate.apply(this, []);
-            ${tickHandler.code};
-        }
-
-        // Death handler
-        const originalOnDeath = $$CustomMob.prototype.$onDeath;
-        $$CustomMob.prototype.$onDeath = function (${deathHandler.args.join(", ")}) {
-            originalOnDeath.apply(this, [${deathHandler.args.join(", ")}]);
-            ${deathHandler.code};
-        }
-
-        // Sounds
-        $$CustomMob.prototype.$getLivingSound = function () { return ModAPI.util.str("${t.sounds.living}"); }
-        $$CustomMob.prototype.$getHurtSound = function () { return ModAPI.util.str("${t.sounds.hurt}"); }
-        $$CustomMob.prototype.$getDeathSound = function () { return ModAPI.util.str("${t.sounds.death}"); }
-        $$CustomMob.prototype.$playStepSound = function () {
-            this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
-            this.wrapped.playSound(ModAPI.util.str("${t.sounds.step}"), 0.2, 1);
-        }
-
-        // TODO: Register mob properly with ModAPI.entities
+        ${getHandlerCode("MobConstructor", this.tags.Constructor, ["this", "world"]).code}
     }
 
-    ModAPI.dedicatedServer.appendCode($$ServersideMob); 
-    $$ServersideMob();
+    ModAPI.reflect.prototypeStack(ModAPI.reflect.getClassById("net.minecraft.entity.EntityLiving"), $$CustomMob);
+
+    // ===== TICK =====
+    $$CustomMob.prototype.$onLivingUpdate = function () {
+        ${getHandlerCode("MobTick", this.tags.Tick, ["this"]).code}
+        this.super$onLivingUpdate();
+    };
+
+    // ===== INTERACT =====
+    $$CustomMob.prototype.$interact = function ($$player) {
+        ${getHandlerCode("MobInteract", this.tags.Interact, ["this", "$$player"]).code}
+        return true;
+    };
+
+    // ===== ATTACK =====
+    $$CustomMob.prototype.$attackEntityAsMob = function ($$target) {
+        ${getHandlerCode("MobAttack", this.tags.Attack, ["this", "$$target"]).code}
+        return true;
+    };
+
+    // ===== DEATH =====
+    $$CustomMob.prototype.$onDeath = function ($$damageSource) {
+        ${getHandlerCode("MobDeath", this.tags.Death, ["this", "$$damageSource"]).code}
+        this.super$onDeath($$damageSource);
+    };
+
+    // ===== REGISTRATION =====
+    function $$internal_reg() {
+        // Register entity
+        ModAPI.entities.register("${this.tags.id}", $$CustomMob, {
+            name: "${this.tags.name}",
+            egg: [
+                0x${this.tags.eggPrimary.replace("#", "")},
+                0x${this.tags.eggSecondary.replace("#", "")}
+            ],
+            trackingRange: ${this.tags.trackingRange}
+        });
+
+        // Register renderer (client only)
+        if (ModAPI.isClient()) {
+            var $$Renderer = "RenderLiving";
+            var $$Model = "ModelZombie"; // default model, can be changed
+            ModAPI.entities.registerRenderer("${this.tags.id}", $$Renderer, $$Model, 0.5);
+
+            // Register texture
+            AsyncSink.setFile(
+                "resourcepacks/AsyncSinkLib/assets/minecraft/textures/entity/${this.tags.id}.png",
+                await (await fetch("${this.tags.texture}")).arrayBuffer()
+            );
+        }
+    }
+
+    if (ModAPI.entities) {
+        $$internal_reg();
+    } else {
+        ModAPI.addEventListener("bootstrap", $$internal_reg);
+    }
 })();`;
     }
 };
