@@ -1,10 +1,9 @@
 PRIMITIVES["mob"] = {
     name: "Mob",
-    description: "Add a custom mob entity to the game",
     uses: [],
     type: "mob",
-    list: true,
     tags: {
+        list: true,
         id: "custom_mob",
         name: "Custom Mob",
         texture: VALUE_ENUMS.IMG,
