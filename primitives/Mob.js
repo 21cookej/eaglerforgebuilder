@@ -3,7 +3,6 @@ PRIMITIVES["mob"] = {
     uses: [],
     type: "mob",
     tags: {
-        list: true,
         id: "custom_mob",
         name: "Custom Mob",
         texture: VALUE_ENUMS.IMG,
@@ -53,7 +52,7 @@ PRIMITIVES["mob"] = {
     asJavaScript: function () {
         var constructorHandler = getHandlerCode("MobConstructor", this.tags.Constructor, ["$$entity"]);
         var livingUpdateHandler = getHandlerCode("MobLivingUpdate", this.tags.LivingUpdate, ["$$entity"]);
-        var interactHandler = getHandlerCode("MobInteract", this.tags.OnInteract, ["$entity", "$player"], {
+        var interactHandler = getHandlerCode("MobInteract", this.tags.OnInteract, ["$$entity", "$$player"], {
             "1_8": function (argNames, code) {
                 return `
                 nme_CustomEntity.prototype.$interact = function (${argNames[1]}) {
@@ -67,7 +66,7 @@ PRIMITIVES["mob"] = {
             },
             "1_12": function (argNames, code) {
                 return `
-                var $EnumHand = ModAPI.reflect.getClassById("net.minecraft.util.EnumHand").staticVariables;
+                var $$EnumHand = ModAPI.reflect.getClassById("net.minecraft.util.EnumHand").staticVariables;
                 nme_CustomEntity.prototype.$processInteract = function (${argNames[1]}, $handEnum) {
                     this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
                     var ${argNames[0]} = this.wrapped;
@@ -134,6 +133,15 @@ PRIMITIVES["mob"] = {
             "SPIDER": "net.minecraft.client.model.ModelSpider"
         };
 
+        // Check if texture is defined
+        const hasTexture = this.tags.texture && this.tags.texture !== VALUE_ENUMS.IMG && this.tags.texture.length > 0;
+        
+        // Check if audio files are defined
+        const hasIdleAudio = this.tags.idleAudioFile && this.tags.idleAudioFile !== VALUE_ENUMS.AUDIO && this.tags.idleAudioFile.length > 0;
+        const hasHurtAudio = this.tags.hurtAudioFile && this.tags.hurtAudioFile !== VALUE_ENUMS.AUDIO && this.tags.hurtAudioFile.length > 0;
+        const hasDeathAudio = this.tags.deathAudioFile && this.tags.deathAudioFile !== VALUE_ENUMS.AUDIO && this.tags.deathAudioFile.length > 0;
+        const hasStepAudio = this.tags.stepAudioFile && this.tags.stepAudioFile !== VALUE_ENUMS.AUDIO && this.tags.stepAudioFile.length > 0;
+
         return `(function CustomMobEntity() {
     ModAPI.meta.title("${this.tags.name} Mod");
     ModAPI.meta.description("Adds ${this.tags.name} to the game");
@@ -175,7 +183,7 @@ PRIMITIVES["mob"] = {
             ${this.tags.canSwim ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAISwimming", 1)(this));` : ''}
             ${this.tags.canPanic ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIPanic", 2)(this, ${this.tags.panicSpeed}));` : ''}
             ${this.tags.canMate ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIMate", 2)(this, ${this.tags.mateSpeed}));` : ''}
-            this.wrapped.tasks.addTask(taskId++, AITask("EntityAITempt", 4)(this, 1.5, ModAPI.items["${this.tags.breedingItem}"].getRef(), 0));
+            this.wrapped.tasks.addTask(taskId++, AITask("EntityAITempt", 4)(this, 1.5, ModAPI.items["${this.tags.breedingItem}"]?.getRef() || ModAPI.items.wheat.getRef(), 0));
             ${this.tags.canFollowParent ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIFollowParent", 2)(this, ${this.tags.followParentSpeed}));` : ''}
             ${this.tags.canWander ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIWander", 2)(this, ${this.tags.wanderSpeed}));` : ''}
             ${this.tags.canWatchPlayer ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIWatchClosest", 3)(this, ModAPI.util.asClass(EntityPlayer.class), ${this.tags.watchDistance}));` : ''}
@@ -217,13 +225,7 @@ PRIMITIVES["mob"] = {
             ${livingUpdateHandler.code};
         }
 
-        nme_CustomEntity.prototype.$interact = function ($player) {
-            this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
-            var $entity = this.wrapped;
-            var $player = ModAPI.util.wrap($player);
-            ${interactHandler.code};
-            return 0;
-        }
+        ${interactHandler}
 
         nme_CustomEntity.prototype.$getLivingSound = function () {
             return ModAPI.util.str("${this.tags.livingSound}");
@@ -239,14 +241,15 @@ PRIMITIVES["mob"] = {
             this.wrapped.playSound(ModAPI.util.str("${this.tags.stepSound}"), ${this.tags.stepVolume}, 1);
         }
         nme_CustomEntity.prototype.$getDropItem = function () {
-            return ModAPI.items["${this.tags.dropItem}"].getRef();
+            return ModAPI.items["${this.tags.dropItem}"]?.getRef() || ModAPI.items.leather.getRef();
         }
         nme_CustomEntity.prototype.$createChild = function (otherParent) {
             this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
             return new nme_CustomEntity(this.wrapped.worldObj?.getRef() ?? null);
         }
         nme_CustomEntity.prototype.$isBreedingItem = function (itemstack) {
-            return itemstack !== null && itemstack.$getItem() === ModAPI.items["${this.tags.breedingItem}"].getRef();
+            var breedItem = ModAPI.items["${this.tags.breedingItem}"]?.getRef() || ModAPI.items.wheat.getRef();
+            return itemstack !== null && itemstack.$getItem() === breedItem;
         }
         // END CUSTOM ENTITY
 
@@ -351,58 +354,91 @@ PRIMITIVES["mob"] = {
     var data = registerEntity();
 
     ModAPI.addEventListener("lib:asyncsink", async () => {
-        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/entity/${this.tags.id}.png", await (await fetch(
-            "${this.tags.texture}"
-        )).arrayBuffer());
-        AsyncSink.hideFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/entity/${this.tags.id}.png.mcmeta");
+        ${hasTexture ? `
+        try {
+            AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/entity/${this.tags.id}.png", await (await fetch(
+                "${this.tags.texture}"
+            )).arrayBuffer());
+            AsyncSink.hideFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/entity/${this.tags.id}.png.mcmeta");
+        } catch(e) {
+            console.warn("Failed to load mob texture:", e);
+        }
+        ` : ''}
 
         await waitForRenderManager();
 
-        // Register sounds
-        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/idle.ogg", await (await fetch(
-            "${this.tags.idleAudioFile}"
-        )).arrayBuffer());
-        AsyncSink.Audio.register("${this.tags.livingSound}", AsyncSink.Audio.Category.ANIMALS, [{
-            path: "sounds/mob/${this.tags.id}/idle.ogg",
-            pitch: 1,
-            volume: 1,
-            streaming: false
-        }]);
+        ${hasIdleAudio ? `
+        try {
+            AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/idle.ogg", await (await fetch(
+                "${this.tags.idleAudioFile}"
+            )).arrayBuffer());
+            AsyncSink.Audio.register("${this.tags.livingSound}", AsyncSink.Audio.Category.ANIMALS, [{
+                path: "sounds/mob/${this.tags.id}/idle.ogg",
+                pitch: 1,
+                volume: 1,
+                streaming: false
+            }]);
+        } catch(e) {
+            console.warn("Failed to load idle sound:", e);
+        }
+        ` : ''}
 
-        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/hurt.ogg", await (await fetch(
-            "${this.tags.hurtAudioFile}"
-        )).arrayBuffer());
-        AsyncSink.Audio.register("${this.tags.hurtSound}", AsyncSink.Audio.Category.ANIMALS, [{
-            path: "sounds/mob/${this.tags.id}/hurt.ogg",
-            pitch: 1,
-            volume: 1,
-            streaming: false
-        }]);
+        ${hasHurtAudio ? `
+        try {
+            AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/hurt.ogg", await (await fetch(
+                "${this.tags.hurtAudioFile}"
+            )).arrayBuffer());
+            AsyncSink.Audio.register("${this.tags.hurtSound}", AsyncSink.Audio.Category.ANIMALS, [{
+                path: "sounds/mob/${this.tags.id}/hurt.ogg",
+                pitch: 1,
+                volume: 1,
+                streaming: false
+            }]);
+        } catch(e) {
+            console.warn("Failed to load hurt sound:", e);
+        }
+        ` : ''}
 
-        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/death.ogg", await (await fetch(
-            "${this.tags.deathAudioFile}"
-        )).arrayBuffer());
-        AsyncSink.Audio.register("${this.tags.deathSound}", AsyncSink.Audio.Category.ANIMALS, [{
-            path: "sounds/mob/${this.tags.id}/death.ogg",
-            pitch: 1,
-            volume: 1,
-            streaming: false
-        }]);
+        ${hasDeathAudio ? `
+        try {
+            AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/death.ogg", await (await fetch(
+                "${this.tags.deathAudioFile}"
+            )).arrayBuffer());
+            AsyncSink.Audio.register("${this.tags.deathSound}", AsyncSink.Audio.Category.ANIMALS, [{
+                path: "sounds/mob/${this.tags.id}/death.ogg",
+                pitch: 1,
+                volume: 1,
+                streaming: false
+            }]);
+        } catch(e) {
+            console.warn("Failed to load death sound:", e);
+        }
+        ` : ''}
 
-        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/step.ogg", await (await fetch(
-            "${this.tags.stepAudioFile}"
-        )).arrayBuffer());
-        AsyncSink.Audio.register("${this.tags.stepSound}", AsyncSink.Audio.Category.ANIMALS, [{
-            path: "sounds/mob/${this.tags.id}/step.ogg",
-            pitch: 1,
-            volume: 1,
-            streaming: false
-        }]);
+        ${hasStepAudio ? `
+        try {
+            AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/step.ogg", await (await fetch(
+                "${this.tags.stepAudioFile}"
+            )).arrayBuffer());
+            AsyncSink.Audio.register("${this.tags.stepSound}", AsyncSink.Audio.Category.ANIMALS, [{
+                path: "sounds/mob/${this.tags.id}/step.ogg",
+                pitch: 1,
+                volume: 1,
+                streaming: false
+            }]);
+        } catch(e) {
+            console.warn("Failed to load step sound:", e);
+        }
+        ` : ''}
 
-        ModAPI.mc.renderManager.entityRenderMap.put(ModAPI.util.asClass(data.EntityCustom), new data.RenderCustom(ModAPI.mc.renderManager.getRef(), new data.ModelCustom(), ${this.tags.shadowSize}));
-        ModAPI.promisify(ModAPI.mc.renderEngine.bindTexture)(data.mobTextures).then(() => {
-            console.log("Loaded ${this.tags.name} texture into cache.");
-        });
+        try {
+            ModAPI.mc.renderManager.entityRenderMap.put(ModAPI.util.asClass(data.EntityCustom), new data.RenderCustom(ModAPI.mc.renderManager.getRef(), new data.ModelCustom(), ${this.tags.shadowSize}));
+            ModAPI.promisify(ModAPI.mc.renderEngine.bindTexture)(data.mobTextures).then(() => {
+                console.log("Loaded ${this.tags.name} texture into cache.");
+            });
+        } catch(e) {
+            console.warn("Failed to register renderer:", e);
+        }
     });
 })();`
     }
