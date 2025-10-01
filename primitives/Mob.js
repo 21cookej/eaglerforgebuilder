@@ -1,7 +1,9 @@
 PRIMITIVES["mob"] = {
     name: "Mob",
+    description: "Add a custom mob entity to the game",
     uses: [],
     type: "mob",
+    list: true,
     tags: {
         id: "custom_mob",
         name: "Custom Mob",
@@ -52,7 +54,31 @@ PRIMITIVES["mob"] = {
     asJavaScript: function () {
         var constructorHandler = getHandlerCode("MobConstructor", this.tags.Constructor, ["$$entity"]);
         var livingUpdateHandler = getHandlerCode("MobLivingUpdate", this.tags.LivingUpdate, ["$$entity"]);
-        var interactHandler = getHandlerCode("MobInteract", this.tags.OnInteract, ["$$entity", "$$player"]);
+        var interactHandler = getHandlerCode("MobInteract", this.tags.OnInteract, ["$entity", "$player"], {
+            "1_8": function (argNames, code) {
+                return `
+                nme_CustomEntity.prototype.$interact = function (${argNames[1]}) {
+                    this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
+                    var ${argNames[0]} = this.wrapped;
+                    var ${argNames[1]} = ModAPI.util.wrap(${argNames[1]});
+                    ${code};
+                    return 0;
+                }
+                `
+            },
+            "1_12": function (argNames, code) {
+                return `
+                var $EnumHand = ModAPI.reflect.getClassById("net.minecraft.util.EnumHand").staticVariables;
+                nme_CustomEntity.prototype.$processInteract = function (${argNames[1]}, $handEnum) {
+                    this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
+                    var ${argNames[0]} = this.wrapped;
+                    var ${argNames[1]} = ModAPI.util.wrap(${argNames[1]});
+                    ${code};
+                    return 0;
+                }
+                `
+            }
+        });
         var eyeHeightHandler = getHandlerCode("MobEyeHeight", this.tags.GetEyeHeight, ["$$entity"]);
 
         const biomeMapping = {
@@ -194,8 +220,8 @@ PRIMITIVES["mob"] = {
 
         nme_CustomEntity.prototype.$interact = function ($player) {
             this.wrapped ||= ModAPI.util.wrap(this).getCorrective();
-            var $$entity = this.wrapped;
-            var $$player = ModAPI.util.wrap($player);
+            var $entity = this.wrapped;
+            var $player = ModAPI.util.wrap($player);
             ${interactHandler.code};
             return 0;
         }
@@ -248,6 +274,7 @@ PRIMITIVES["mob"] = {
         nmcre_CustomRender.prototype.$getEntityTexture = function (entity) {
             return mobTextures;
         }
+        ${flags.target === "1_12" ? `
         nmcre_CustomRender.prototype.$handleRotationFloat = function (entity, partialTicks) {
             entity = ModAPI.util.wrap(entity);
             if ((!entity.onGround) && (!entity.isInWater())) {
@@ -256,6 +283,17 @@ PRIMITIVES["mob"] = {
                 return 0;
             }
         }
+        ` : `
+        nmcre_CustomRender.prototype.$func_77044_a = function (entity, partialTicks) {
+            entity = ModAPI.util.wrap(entity);
+            if ((!entity.onGround) && (!entity.isInWater())) {
+                return 2;
+            } else {
+                return 0;
+            }
+        }
+        `}
+        // END CUSTOM RENDERER
 
         const ID = ModAPI.keygen.entity("${this.tags.id}");
         ModAPI.reflect.getClassById("net.minecraft.entity.EntityList").staticMethods.addMapping0.method(
