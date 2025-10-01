@@ -12,79 +12,44 @@ PRIMITIVES["mob"] = {
         eggPrimary: "#00FF00",
         eggSecondary: "#000000",
         texture: VALUE_ENUMS.IMG,
-        AI: [],
-        Constructor: VALUE_ENUMS.ABSTRACT_HANDLER + "MobConstructor",
-        Tick: VALUE_ENUMS.ABSTRACT_HANDLER + "MobTick",
-        Interact: VALUE_ENUMS.ABSTRACT_HANDLER + "MobInteract",
-        Attack: VALUE_ENUMS.ABSTRACT_HANDLER + "MobAttack",
-        Death: VALUE_ENUMS.ABSTRACT_HANDLER + "MobDeath",
+        baseMob: ["Zombie", "Cow", "Pig", "Sheep", "Skeleton", "Creeper"], // dropdown of base mobs
+        creativeTab: ["Misc", "Combat", "Spawn Eggs"], // tab for spawn egg
     },
     getDependencies: function () {
         return [];
     },
     asJavaScript: function () {
         return `
-(function MobDatablock() {
-    // ===== ENTITY CLASS =====
-    function $$CustomMob(world) {
-        var $$EntityLiving = ModAPI.reflect.getClassById("net.minecraft.entity.EntityLiving");
-        var $$EntitySuper = ModAPI.reflect.getSuper($$EntityLiving, (x)=>x.length===1);
-        $$EntitySuper(this, world);
-
-        this.$setSize(${this.tags.width}, ${this.tags.height});
-        this.$setHealth(${this.tags.health});
-
-        ${getHandlerCode("MobConstructor", this.tags.Constructor, ["this", "world"]).code}
-    }
-
-    ModAPI.reflect.prototypeStack(ModAPI.reflect.getClassById("net.minecraft.entity.EntityLiving"), $$CustomMob);
-
-    // ===== TICK =====
-    $$CustomMob.prototype.$onLivingUpdate = function () {
-        ${getHandlerCode("MobTick", this.tags.Tick, ["this"]).code}
-        this.super$onLivingUpdate();
-    };
-
-    // ===== INTERACT =====
-    $$CustomMob.prototype.$interact = function ($$player) {
-        ${getHandlerCode("MobInteract", this.tags.Interact, ["this", "$$player"]).code}
-        return true;
-    };
-
-    // ===== ATTACK =====
-    $$CustomMob.prototype.$attackEntityAsMob = function ($$target) {
-        ${getHandlerCode("MobAttack", this.tags.Attack, ["this", "$$target"]).code}
-        return true;
-    };
-
-    // ===== DEATH =====
-    $$CustomMob.prototype.$onDeath = function ($$damageSource) {
-        ${getHandlerCode("MobDeath", this.tags.Death, ["this", "$$damageSource"]).code}
-        this.super$onDeath($$damageSource);
-    };
+(async function MobDatablock() {
+    const $$mobId = "${this.tags.id}";
+    const $$mobName = "${this.tags.name}";
+    const $$eggPrimary = 0x${this.tags.eggPrimary.replace("#", "")};
+    const $$eggSecondary = 0x${this.tags.eggSecondary.replace("#", "")};
+    const $$mobTexture = "${this.tags.texture}";
+    const $$baseMob = "${this.tags.baseMob}";
+    const $$creativeTab = "${this.tags.creativeTab}";
 
     // ===== REGISTRATION =====
     function $$internal_reg() {
-        // Register entity
-        ModAPI.entities.register("${this.tags.id}", $$CustomMob, {
-            name: "${this.tags.name}",
-            egg: [
-                0x${this.tags.eggPrimary.replace("#", "")},
-                0x${this.tags.eggSecondary.replace("#", "")}
-            ],
-            trackingRange: ${this.tags.trackingRange}
+        // Register entity (reuse base mob's AI/behavior/model)
+        ModAPI.entities.register($$mobId, ModAPI.entities.getBaseClass($$baseMob), {
+            name: $$mobName,
+            egg: [$$eggPrimary, $$eggSecondary],
+            trackingRange: ${this.tags.trackingRange},
+            width: ${this.tags.width},
+            height: ${this.tags.height},
+            health: ${this.tags.health},
+            creativeTab: $$creativeTab
         });
 
         // Register renderer (client only)
         if (ModAPI.isClient()) {
-            var $$Renderer = "RenderLiving";
-            var $$Model = "ModelZombie"; // default model, can be changed
-            ModAPI.entities.registerRenderer("${this.tags.id}", $$Renderer, $$Model, 0.5);
+            ModAPI.entities.registerRenderer($$mobId, "RenderLiving", "Model" + $$baseMob, 0.5);
 
-            // Register texture
+            // Register custom texture for this mob
             AsyncSink.setFile(
-                "resourcepacks/AsyncSinkLib/assets/minecraft/textures/entity/${this.tags.id}.png",
-                await (await fetch("${this.tags.texture}")).arrayBuffer()
+                "resourcepacks/AsyncSinkLib/assets/minecraft/textures/entity/" + $$mobId + ".png",
+                await (await fetch($$mobTexture)).arrayBuffer()
             );
         }
     }
