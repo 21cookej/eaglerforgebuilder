@@ -242,6 +242,11 @@ PRIMITIVES["mob"] = {
             AsyncSink.L10N.set("entity.${this.tags.name}.name", "${this.tags.name}");
         });
         
+        var spawnEggItem = ModAPI.reflect.getClassById("net.minecraft.item.ItemMonsterPlacer").staticMethods.getItemFromEntityId.method(ID);
+        if (spawnEggItem) {
+            ModAPI.items["${this.tags.id}_spawn_egg"] = spawnEggItem;
+        }
+        
         return { CustomEntity, CustomModel, CustomRender, mobTextures };
     }
     
