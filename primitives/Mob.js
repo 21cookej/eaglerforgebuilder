@@ -41,16 +41,54 @@ PRIMITIVES["mob"] = {
         return [];
     },
     asJavaScript: function () {
-        var constructorHandler = getHandlerCode("MobConstructor", this.tags.Constructor, ["$$entity"]);
-        var livingUpdateHandler = getHandlerCode("MobLivingUpdate", this.tags.LivingUpdate, ["$$entity"]);
-        var interactHandler = getHandlerCode("MobInteract", this.tags.OnInteract, ["$$entity", "$$player"]);
+        const tags = { ...this.tags };
+        
+        var constructorHandler = getHandlerCode("MobConstructor", tags.Constructor, ["$entity"]);
+        var livingUpdateHandler = getHandlerCode("MobLivingUpdate", tags.LivingUpdate, ["$entity"]);
+        var interactHandler = getHandlerCode("MobInteract", tags.OnInteract, ["$entity", "$player"]);
 
         return `(function CustomMobEntity() {
-    console.log("Loading ${this.tags.name} mod");
+    ModAPI.meta.title("${tags.name} Mod");
     
     function registerEntity() {
-        console.log("Registering ${this.tags.name} entity");
-        return { success: true };
+        var EntityAnimal = ModAPI.reflect.getClassById("net.minecraft.entity.passive.EntityAnimal");
+        var entitySuper = ModAPI.reflect.getSuper(EntityAnimal, (x) => x.length === 2);
+        
+        var CustomEntity = function CustomEntity(worldIn) {
+            entitySuper(this, worldIn);
+            this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
+            this.wrapped.setSize(${tags.width}, ${tags.height});
+            var $entity = this.wrapped;
+            ${constructorHandler.code};
+        }
+        
+        ModAPI.reflect.prototypeStack(EntityAnimal, CustomEntity);
+        
+        CustomEntity.prototype.$onLivingUpdate = function () {
+            this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
+            var $entity = this.wrapped;
+            ${livingUpdateHandler.code};
+        }
+        
+        CustomEntity.prototype.$interact = function (player) {
+            this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
+            var $entity = this.wrapped;
+            var $player = ModAPI.util.wrap(player);
+            ${interactHandler.code};
+            return 0;
+        }
+        
+        var ID = ModAPI.keygen.entity("${tags.id}");
+        ModAPI.reflect.getClassById("net.minecraft.entity.EntityList").staticMethods.addMapping0.method(
+            ModAPI.util.asClass(CustomEntity),
+            { $createEntity: function (w) { return new CustomEntity(w); } },
+            ModAPI.util.str("${tags.name}"),
+            ID,
+            ${tags.spawnEggBaseColor},
+            ${tags.spawnEggSpotColor}
+        );
+        
+        return { CustomEntity: CustomEntity };
     }
     
     ModAPI.dedicatedServer.appendCode(registerEntity);
