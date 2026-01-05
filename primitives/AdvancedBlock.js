@@ -7,7 +7,7 @@ PRIMITIVES["block_advanced"] = {
         id: "advanced_block",
         name: "Advanced Block",
         texture: VALUE_ENUMS.IMG,
-        animatedSpritesheetTexture: false, // https://sheeptester.github.io/words-go-here/misc/animated-painting-maker.html
+        animatedSpritesheetTexture: false,
         animatedTextureFrameDuration: 1,
         animatedTextureInterpolate: false,
         tickRatio: 10,
@@ -186,39 +186,91 @@ PRIMITIVES["block_advanced"] = {
             $$renderItem.registerBlock($$cblock, ModAPI.util.str("${this.tags.id}"));
         });
         AsyncSink.L10N.set("tile.${this.tags.id}.name", "${this.tags.name}");
-        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/models/block/${this.tags.id}.json", JSON.stringify(
-            {
-                "parent": "block/cube_all",
-                "textures": {
-                    "all": "blocks/${this.tags.id}"
-                }
-            }
-        ));
-        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/models/item/${this.tags.id}.json", JSON.stringify(
-            {
-                "parent": "block/${this.tags.id}",
-                "display": {
-                    "thirdperson": {
-                        "rotation": [10, -45, 170],
-                        "translation": [0, 1.5, -2.75],
-                        "scale": [0.375, 0.375, 0.375]
+
+        // ------------------------------
+        // TEXTURE + MODEL AUTO-MODE LOGIC
+        // ------------------------------
+
+        const $$rawTex = await (await fetch($$blockTexture)).arrayBuffer();
+        const $$img = await AsyncSink.imageInfo($$rawTex);
+        const $$isPerFace = ($$img.width === $$img.height * 6);
+
+        // MODEL JSON
+        if (!$$isPerFace) {
+            AsyncSink.setFile(
+                "resourcepacks/AsyncSinkLib/assets/minecraft/models/block/${this.tags.id}.json",
+                JSON.stringify({
+                    parent: "block/cube_all",
+                    textures: { all: "blocks/${this.tags.id}" }
+                })
+            );
+        } else {
+            AsyncSink.setFile(
+                "resourcepacks/AsyncSinkLib/assets/minecraft/models/block/${this.tags.id}.json",
+                JSON.stringify({
+                    parent: "block/cube",
+                    textures: {
+                        up:    "blocks/${this.tags.id}_top",
+                        down:  "blocks/${this.tags.id}_bottom",
+                        north: "blocks/${this.tags.id}_north",
+                        east:  "blocks/${this.tags.id}_east",
+                        south: "blocks/${this.tags.id}_south",
+                        west:  "blocks/${this.tags.id}_west"
+                    }
+                })
+            );
+        }
+
+        // ITEM MODEL (unchanged)
+        AsyncSink.setFile(
+            "resourcepacks/AsyncSinkLib/assets/minecraft/models/item/${this.tags.id}.json",
+            JSON.stringify({
+                parent: "block/${this.tags.id}",
+                display: {
+                    thirdperson: {
+                        rotation: [10, -45, 170],
+                        translation: [0, 1.5, -2.75],
+                        scale: [0.375, 0.375, 0.375]
                     }
                 }
-            }
-        ));
-        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/blockstates/${this.tags.id}.json", JSON.stringify(
-            {
-                "variants": {
-                    "normal": [
-                        { "model": "${this.tags.id}" },
-                    ]
+            })
+        );
+
+        // BLOCKSTATE (unchanged)
+        AsyncSink.setFile(
+            "resourcepacks/AsyncSinkLib/assets/minecraft/blockstates/${this.tags.id}.json",
+            JSON.stringify({
+                variants: {
+                    normal: [{ model: "${this.tags.id}" }]
                 }
+            })
+        );
+
+        // TEXTURE HANDLING
+        if (!$$isPerFace) {
+            AsyncSink.setFile(
+                "resourcepacks/AsyncSinkLib/assets/minecraft/textures/blocks/${this.tags.id}.png",
+                $$rawTex
+            );
+
+            ${this.tags.animatedSpritesheetTexture ? animationCode : ""}
+        } else {
+            const $$faceNames = ["top","bottom","north","east","south","west"];
+
+            for (let i = 0; i < 6; i++) {
+                const $$slice = await AsyncSink.sliceImage($$rawTex, {
+                    x: i * $$img.height,
+                    y: 0,
+                    width: $$img.height,
+                    height: $$img.height
+                });
+
+                AsyncSink.setFile(
+                    \`resourcepacks/AsyncSinkLib/assets/minecraft/textures/blocks/${this.tags.id}_\${$$faceNames[i]}.png\`,
+                    $$slice
+                );
             }
-        ));
-        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/blocks/${this.tags.id}.png", await (await fetch(
-            $$blockTexture
-        )).arrayBuffer());
-        ${this.tags.animatedSpritesheetTexture ? animationCode : ""}
+        }
     });
 })();`;
     }
