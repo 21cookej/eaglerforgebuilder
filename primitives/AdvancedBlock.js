@@ -8,9 +8,9 @@ PRIMITIVES["block_advanced"] = {
         name: "Advanced Block",
         texture: VALUE_ENUMS.IMG,
 
-        // NEW TAGS (Option 3)
-        blockbenchModelJson: VALUE_ENUMS.LONG_STRING,   // paste JSON directly
-        blockbenchModelFile: VALUE_ENUMS.STR,           // uploaded JSON file path
+        // NEW TAGS: both are simple text boxes now
+        blockbenchModelJson: VALUE_ENUMS.STR,   // paste JSON directly as text
+        blockbenchModelFile: VALUE_ENUMS.STR,   // uploaded JSON file path (relative inside AsyncSink)
 
         animatedSpritesheetTexture: false,
         animatedTextureFrameDuration: 1,
@@ -107,7 +107,7 @@ PRIMITIVES["block_advanced"] = {
     const $$modelFilePath = "${this.tags.blockbenchModelFile || ""}";
 
     // -------------------------------
-    // NEW: Blockbench model loader
+    // Blockbench model loader (JSON paste or uploaded file)
     // -------------------------------
     async function $$loadBlockbenchModel() {
         // 1. DIRECT JSON PASTE
@@ -116,7 +116,7 @@ PRIMITIVES["block_advanced"] = {
             catch (e) { ModAPI.logger.warn("[${this.tags.id}] Invalid pasted JSON: " + e); }
         }
 
-        // 2. LOCAL UPLOADED FILE
+        // 2. LOCAL UPLOADED FILE (via AsyncSink)
         if ($$modelFilePath) {
             try {
                 const buf = await AsyncSink.getFile($$modelFilePath);
@@ -131,7 +131,7 @@ PRIMITIVES["block_advanced"] = {
     }
 
     // -------------------------------
-    // NEW: Blockbench model scanner
+    // Blockbench model scanner (textures, particles, UV mappings)
     // -------------------------------
     function $$scanBlockbenchModel($$model, $$prefix) {
         var $$textures = {};
@@ -139,50 +139,65 @@ PRIMITIVES["block_advanced"] = {
         var $$uvMappings = [];
 
         try {
-            if ($$model.textures) {
-                for (var k in $$model.textures) {
-                    if (typeof $$model.textures[k] === "string")
-                        $$textures[k] = $$model.textures[k];
-                }
-                if (typeof $$model.textures.particle === "string")
-                    $$particle = $$model.textures.particle;
-            }
-
-            if (Array.isArray($$model.elements)) {
-                $$model.elements.forEach((elem, ei) => {
-                    if (!elem.faces) return;
-                    for (var face in elem.faces) {
-                        var f = elem.faces[face];
-                        $$uvMappings.push({
-                            elementIndex: ei,
-                            face: face,
-                            textureRef: f.texture,
-                            uv: f.uv
-                        });
+            if ($$model && typeof $$model === "object") {
+                if ($$model.textures && typeof $$model.textures === "object") {
+                    for (var k in $$model.textures) {
+                        if (typeof $$model.textures[k] === "string") {
+                            $$textures[k] = $$model.textures[k];
+                        }
                     }
-                });
+                    if (typeof $$model.textures.particle === "string") {
+                        $$particle = $$model.textures.particle;
+                    }
+                }
+
+                if (Array.isArray($$model.elements)) {
+                    $$model.elements.forEach(function (elem, ei) {
+                        if (!elem || !elem.faces) return;
+                        for (var face in elem.faces) {
+                            var f = elem.faces[face];
+                            if (!f) continue;
+                            $$uvMappings.push({
+                                elementIndex: ei,
+                                face: face,
+                                textureRef: f.texture,
+                                uv: Array.isArray(f.uv) ? f.uv : null
+                            });
+                        }
+                    });
+                }
             }
         } catch (e) {
             ModAPI.logger.warn($$prefix + " scan error: " + e);
         }
 
-        ModAPI.logger.info($$prefix + " Textures:");
-        Object.keys($$textures).forEach(k => ModAPI.logger.info("  " + k + " -> " + $$textures[k]));
+        try {
+            ModAPI.logger.info($$prefix + " Textures:");
+            Object.keys($$textures).forEach(function (k) {
+                ModAPI.logger.info("  " + k + " -> " + $$textures[k]);
+            });
 
-        ModAPI.logger.info($$prefix + " Particle: " + ($$particle || "none"));
+            ModAPI.logger.info($$prefix + " Particle: " + ($$particle || "none"));
 
-        ModAPI.logger.info($$prefix + " UV mappings:");
-        $$uvMappings.forEach(m => {
-            ModAPI.logger.info(
-                "  element[" + m.elementIndex + "]." + m.face +
-                " tex=" + m.textureRef +
-                " uv=" + JSON.stringify(m.uv)
-            );
-        });
+            ModAPI.logger.info($$prefix + " UV mappings:");
+            $$uvMappings.forEach(function (m) {
+                ModAPI.logger.info(
+                    "  element[" + m.elementIndex + "]." + m.face +
+                    " tex=" + m.textureRef +
+                    " uv=" + JSON.stringify(m.uv)
+                );
+            });
+        } catch (e2) {}
+
+        return {
+            textures: $$textures,
+            particle: $$particle,
+            uvMappings: $$uvMappings
+        };
     }
 
     // -------------------------------
-    // BLOCK REGISTRATION
+    // BLOCK REGISTRATION (server side)
     // -------------------------------
     function $$ServersideBlocks() {
         const $$scoped_efb_globals = {};
@@ -236,7 +251,7 @@ PRIMITIVES["block_advanced"] = {
         };
 
         $$nmb_AdvancedBlock.prototype.$tickRate = function () {
-            return ${Math.max(1, Math.floor(this.tags.tickRatio))};
+            return ${Math.max(1, Math.floor(this.tags.tickRatio || 10))};
         };
 
         ${entityCollisionHandler}
