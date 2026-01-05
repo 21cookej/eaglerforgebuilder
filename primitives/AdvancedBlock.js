@@ -7,7 +7,7 @@ PRIMITIVES["block_advanced"] = {
         id: "advanced_block",
         name: "Advanced Block",
         texture: VALUE_ENUMS.IMG,
-        animatedSpritesheetTexture: false,
+        animatedSpritesheetTexture: false, // https://sheeptester.github.io/words-go-here/misc/animated-painting-maker.html
         animatedTextureFrameDuration: 1,
         animatedTextureInterpolate: false,
         tickRatio: 10,
@@ -30,53 +30,79 @@ PRIMITIVES["block_advanced"] = {
         var constructorHandler = getHandlerCode("BlockConstructor", this.tags.Constructor, []);
         var breakHandler = getHandlerCode("BlockBreak", this.tags.Break, ["$$world", "$$blockpos", "$$blockstate"]);
         var addedHandler = getHandlerCode("BlockAdded", this.tags.Added, ["$$world", "$$blockpos", "$$blockstate"]);
-        var neighborHandler = getHandlerCode("BlockNeighbourChange", this.tags.NeighborChange, ["$$world", "$$blockpos", "$$blockstate"], {
-            "1_8": function (args, code) {
-                return `
+        var neighborHandler = getHandlerCode(
+            "BlockNeighbourChange",
+            this.tags.NeighborChange,
+            ["$$world", "$$blockpos", "$$blockstate"],
+            {
+                "1_8": function (args, code) {
+                    return `
                 var $$onNeighborBlockChangeMethod = $$blockClass.methods.onNeighborBlockChange.method;
                 $$nmb_AdvancedBlock.prototype.$onNeighborBlockChange = function (${args.join(", ")}) {
                     ${code};
                     return $$onNeighborBlockChangeMethod(this, ${args.join(", ")});
                 }
-                `
-            },
-            "1_12": function (args, code) {
-                const copy = [...args];
-                copy[0] = args[1];
-                copy[1] = args[2];
-                copy[2] = args[0];
-                return `
+                `;
+                },
+                "1_12": function (args, code) {
+                    const copy = [...args];
+                    copy[0] = args[1];
+                    copy[1] = args[2];
+                    copy[2] = args[0];
+                    return `
                 var $$onNeighborBlockChangeMethod = $$blockClass.methods.neighborChanged.method;
                 $$nmb_AdvancedBlock.prototype.$neighborChanged = function (${copy.join(", ")}) {
                     ${code};
                     return $$onNeighborBlockChangeMethod(this, ${copy.join(", ")});
                 }
-                `
+                `;
+                }
             }
-        });
-        var brokenByPlayerHandler = getHandlerCode("BlockBrokenByPlayer", this.tags.BrokenByPlayer, ["$$world", "$$blockpos", "$$blockstate"]);
-        var randomTickHandler = getHandlerCode("BlockRandomTick", this.tags.RandomTick, ["$$world", "$$blockpos", "$$blockstate", "$$random"]);
-        var entityCollisionHandler = getHandlerCode("BlockEntityCollision", this.tags.EntityCollided, ["$$world", "$$blockpos", "$$entity"], {
-            "1_8": function (args, code) {
-                return `
+        );
+        var brokenByPlayerHandler = getHandlerCode(
+            "BlockBrokenByPlayer",
+            this.tags.BrokenByPlayer,
+            ["$$world", "$$blockpos", "$$blockstate"]
+        );
+        var randomTickHandler = getHandlerCode(
+            "BlockRandomTick",
+            this.tags.RandomTick,
+            ["$$world", "$$blockpos", "$$blockstate", "$$random"]
+        );
+        var entityCollisionHandler = getHandlerCode(
+            "BlockEntityCollision",
+            this.tags.EntityCollided,
+            ["$$world", "$$blockpos", "$$entity"],
+            {
+                "1_8": function (args, code) {
+                    return `
                 var $$entityCollisionMethod = $$blockClass.methods.onEntityCollidedWithBlock.method;
                 $$nmb_AdvancedBlock.prototype.$onEntityCollidedWithBlock = function (${args.join(", ")}) {
                     ${code};
                     return $$entityCollisionMethod(this, ${args.join(", ")});
                 }`;
-            },
-            "1_12": function (args, code) {
-                const argList = `${args.slice(0,2).join(", ")},$$blockstate,${args[2]}`;
-                return `
+                },
+                "1_12": function (args, code) {
+                    const argList = `${args.slice(0,2).join(", ")},$$blockstate,${args[2]}`;
+                    return `
                 var $$entityCollisionMethod = $$blockClass.methods.onEntityCollidedWithBlock.method;
                 $$nmb_AdvancedBlock.prototype.$onEntityCollidedWithBlock = function (${argList}) {
                     ${code};
                     return $$entityCollisionMethod(this, ${argList});
                 }`;
+                }
             }
-        });
-        var getDroppedItemHandler = getHandlerCode("BlockGetDroppedItem", this.tags.GetDroppedItem, ["$$blockstate", "$$random", "$$forture"]);
-        var quantityDroppedHandler = getHandlerCode("BlockQuantityDropped", this.tags.QuantityDropped, ["$$random", "$$fortune"]);
+        );
+        var getDroppedItemHandler = getHandlerCode(
+            "BlockGetDroppedItem",
+            this.tags.GetDroppedItem,
+            ["$$blockstate", "$$random", "$$forture"]
+        );
+        var quantityDroppedHandler = getHandlerCode(
+            "BlockQuantityDropped",
+            this.tags.QuantityDropped,
+            ["$$random", "$$fortune"]
+        );
 
         var animationCode = `
         AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/blocks/${this.tags.id}.png.mcmeta", efb2__str2ab(
@@ -187,74 +213,87 @@ PRIMITIVES["block_advanced"] = {
         });
         AsyncSink.L10N.set("tile.${this.tags.id}.name", "${this.tags.name}");
 
-        // ------------------------------
-        // TEXTURE + MODEL AUTO-MODE LOGIC
-        // ------------------------------
+        // ---- AUTO TEXTURE/MODEL HANDLING ----
 
-        const $$rawTex = await (await fetch($$blockTexture)).arrayBuffer();
+        const $$rawTex = await (await fetch(
+            $$blockTexture
+        )).arrayBuffer();
         const $$img = await AsyncSink.imageInfo($$rawTex);
         const $$isPerFace = ($$img.width === $$img.height * 6);
 
-        // MODEL JSON
+        // Block model JSON
         if (!$$isPerFace) {
             AsyncSink.setFile(
                 "resourcepacks/AsyncSinkLib/assets/minecraft/models/block/${this.tags.id}.json",
-                JSON.stringify({
-                    parent: "block/cube_all",
-                    textures: { all: "blocks/${this.tags.id}" }
-                })
+                JSON.stringify(
+                    {
+                        "parent": "block/cube_all",
+                        "textures": {
+                            "all": "blocks/${this.tags.id}"
+                        }
+                    }
+                )
             );
         } else {
             AsyncSink.setFile(
                 "resourcepacks/AsyncSinkLib/assets/minecraft/models/block/${this.tags.id}.json",
-                JSON.stringify({
-                    parent: "block/cube",
-                    textures: {
-                        up:    "blocks/${this.tags.id}_top",
-                        down:  "blocks/${this.tags.id}_bottom",
-                        north: "blocks/${this.tags.id}_north",
-                        east:  "blocks/${this.tags.id}_east",
-                        south: "blocks/${this.tags.id}_south",
-                        west:  "blocks/${this.tags.id}_west"
+                JSON.stringify(
+                    {
+                        "parent": "block/cube",
+                        "textures": {
+                            "up":    "blocks/${this.tags.id}_top",
+                            "down":  "blocks/${this.tags.id}_bottom",
+                            "north": "blocks/${this.tags.id}_north",
+                            "east":  "blocks/${this.tags.id}_east",
+                            "south": "blocks/${this.tags.id}_south",
+                            "west":  "blocks/${this.tags.id}_west"
+                        }
                     }
-                })
+                )
             );
         }
 
-        // ITEM MODEL (unchanged)
+        // Item model (unchanged, still points to block model)
         AsyncSink.setFile(
             "resourcepacks/AsyncSinkLib/assets/minecraft/models/item/${this.tags.id}.json",
-            JSON.stringify({
-                parent: "block/${this.tags.id}",
-                display: {
-                    thirdperson: {
-                        rotation: [10, -45, 170],
-                        translation: [0, 1.5, -2.75],
-                        scale: [0.375, 0.375, 0.375]
+            JSON.stringify(
+                {
+                    "parent": "block/${this.tags.id}",
+                    "display": {
+                        "thirdperson": {
+                            "rotation": [10, -45, 170],
+                            "translation": [0, 1.5, -2.75],
+                            "scale": [0.375, 0.375, 0.375]
+                        }
                     }
                 }
-            })
+            )
         );
 
-        // BLOCKSTATE (unchanged)
+        // Blockstate (unchanged)
         AsyncSink.setFile(
             "resourcepacks/AsyncSinkLib/assets/minecraft/blockstates/${this.tags.id}.json",
-            JSON.stringify({
-                variants: {
-                    normal: [{ model: "${this.tags.id}" }]
+            JSON.stringify(
+                {
+                    "variants": {
+                        "normal": [
+                            { "model": "${this.tags.id}" },
+                        ]
+                    }
                 }
-            })
+            )
         );
 
-        // TEXTURE HANDLING
+        // Texture handling
         if (!$$isPerFace) {
+            // Normal square texture
             AsyncSink.setFile(
                 "resourcepacks/AsyncSinkLib/assets/minecraft/textures/blocks/${this.tags.id}.png",
                 $$rawTex
             );
-
             ${this.tags.animatedSpritesheetTexture ? animationCode : ""}
         } else {
+            // 6× wide: slice into per-face textures
             const $$faceNames = ["top","bottom","north","east","south","west"];
 
             for (let i = 0; i < 6; i++) {
@@ -274,4 +313,4 @@ PRIMITIVES["block_advanced"] = {
     });
 })();`;
     }
-}
+};
