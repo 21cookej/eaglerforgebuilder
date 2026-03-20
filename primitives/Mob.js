@@ -9,9 +9,9 @@ PRIMITIVES["mob"] = {
         // visuals
         texture: VALUE_ENUMS.IMG,
         modelType: ["CHICKEN", "PIG", "COW", "SHEEP", "WOLF", "ZOMBIE", "SKELETON", "SPIDER"],
-        width: 0.9,
-        height: 1.4,
-        shadowSize: 0.5,
+        width: 0.4,
+        height: 0.7,
+        shadowSize: 0.3,
 
         // attributes
         maxHealth: 10,
@@ -35,11 +35,12 @@ PRIMITIVES["mob"] = {
         breedingItem: "wheat",
         dropItem: "leather",
 
-        // spawn egg colors (used when no custom egg texture is provided)
+        // egg colors
         spawnEggBaseColor: 0x5e3e2d,
         spawnEggSpotColor: 0x269166,
 
-        // optional custom spawn egg texture (base64) - leave as VALUE_ENUMS.IMG to use color tint
+        // optional custom spawn egg texture - if left as VALUE_ENUMS.IMG (no upload),
+        // the egg will use the vanilla spawn_egg model tinted with the colors above
         spawnEggTexture: VALUE_ENUMS.IMG,
 
         // spawning
@@ -48,14 +49,14 @@ PRIMITIVES["mob"] = {
         spawnMinGroup: 2,
         spawnMaxGroup: 4,
 
-        // sound keys (leave empty string to auto-generate from id)
-        livingSound: "",
-        hurtSound: "",
-        deathSound: "",
-        stepSound: "",
+        // sound keys
+        livingSound: "mob.custom.idle",
+        hurtSound: "mob.custom.hurt",
+        deathSound: "mob.custom.death",
+        stepSound: "mob.custom.step",
         stepVolume: 0.15,
 
-        // audio files (base64)
+        // files (base64)
         idleAudioFile: VALUE_ENUMS.AUDIO,
         hurtAudioFile: VALUE_ENUMS.AUDIO,
         deathAudioFile: VALUE_ENUMS.AUDIO,
@@ -94,45 +95,46 @@ PRIMITIVES["mob"] = {
             "jungle": "jungle"
         };
 
-        const modelClassId = modelMapping[this.tags.modelType] || "net.minecraft.client.model.ModelCow";
+        const modelClassId = modelMapping[this.tags.modelType] || "net.minecraft.client.model.ModelChicken";
 
-        const livingSound = this.tags.livingSound || `mob.${this.tags.id}.idle`;
-        const hurtSound   = this.tags.hurtSound   || `mob.${this.tags.id}.hurt`;
-        const deathSound  = this.tags.deathSound  || `mob.${this.tags.id}.death`;
-        const stepSound   = this.tags.stepSound   || `mob.${this.tags.id}.step`;
+        const eggId = this.tags.id + "_spawn_egg";
+        const eggName = this.tags.name + " Spawn Egg";
 
-        const eggId   = `${this.tags.id}_spawn_egg`;
-        const eggName = `${this.tags.name} Spawn Egg`;
-
-        return `(function MobDatablock() {
-
-    // ── Shared helpers ──────────────────────────────────────────────────────
+        return `(function CustomMobDatablock() {
     function waitForRenderManager() {
         return new Promise((res) => {
             function check() {
-                if (ModAPI.mc && ModAPI.mc.renderManager) res();
-                else setTimeout(check, 50);
+                if (ModAPI.mc && ModAPI.mc.renderManager) {
+                    res();
+                } else {
+                    setTimeout(check, 50);
+                }
             }
             check();
         });
     }
 
-    // ══════════════════════════════════════════════════════════════════════
-    // MOB: ${this.tags.name}  (${this.tags.id})
-    // ══════════════════════════════════════════════════════════════════════
-    function registerMob() {
-        if (ModAPI.hooks && ModAPI.hooks.methods)
+    function registerEntity() {
+        // same workaround as Duck mod
+        if (ModAPI.hooks && ModAPI.hooks.methods) {
             ModAPI.hooks.methods.jl_String_format = ModAPI.hooks.methods.nlev_HString_format;
-
-        function AITask(name, length) {
-            return ModAPI.reflect.getClassById("net.minecraft.entity.ai." + name).constructors.find(x => x.length === length);
         }
 
-        const ResourceLocation = ModAPI.reflect.getClassByName("ResourceLocation").constructors.find(x => x.length === 1);
-        const EntityPlayer = ModAPI.reflect.getClassByName("EntityPlayer");
-        const SharedMonsterAttributes = ModAPI.reflect.getClassByName("SharedMonsterAttributes").staticVariables;
+        function AITask(name, length) {
+            return ModAPI.reflect
+                .getClassById("net.minecraft.entity.ai." + name)
+                .constructors.find(x => x.length === length);
+        }
 
-        // ── Entity class ──────────────────────────────────────────────────
+        const ResourceLocation = ModAPI.reflect
+            .getClassByName("ResourceLocation")
+            .constructors.find(x => x.length === 1);
+        const EntityPlayer = ModAPI.reflect.getClassByName("EntityPlayer");
+        const SharedMonsterAttributes = ModAPI.reflect
+            .getClassByName("SharedMonsterAttributes")
+            .staticVariables;
+
+        // ==== ENTITY CLASS ====
         var entityClass = ModAPI.reflect.getClassById("net.minecraft.entity.passive.EntityAnimal");
         var entitySuper = ModAPI.reflect.getSuper(entityClass, (x) => x.length === 2);
 
@@ -142,13 +144,13 @@ PRIMITIVES["mob"] = {
             this.wrapped.setSize(${this.tags.width}, ${this.tags.height});
 
             var taskId = 0;
-            ${this.tags.canSwim ? "this.wrapped.tasks.addTask(taskId++, AITask(\"EntityAISwimming\", 1)(this));" : ""}
-            ${this.tags.canPanic ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIPanic", 2)(this, ${this.tags.panicSpeed}));` : ""}
-            ${this.tags.canMate  ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIMate", 2)(this, ${this.tags.mateSpeed}));` : ""}
+            ${this.tags.canSwim ? 'this.wrapped.tasks.addTask(taskId++, AITask("EntityAISwimming", 1)(this));' : ''}
+            ${this.tags.canPanic ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIPanic", 2)(this, ${this.tags.panicSpeed}));` : ''}
+            ${this.tags.canMate ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIMate", 2)(this, ${this.tags.mateSpeed}));` : ''}
             this.wrapped.tasks.addTask(taskId++, AITask("EntityAITempt", 4)(this, 1.5, (ModAPI.items["${this.tags.breedingItem}"] || ModAPI.items.wheat).getRef(), 0));
-            ${this.tags.canFollowParent ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIFollowParent", 2)(this, ${this.tags.followParentSpeed}));` : ""}
-            ${this.tags.canWander ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIWander", 2)(this, ${this.tags.wanderSpeed}));` : ""}
-            ${this.tags.canWatchPlayer ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIWatchClosest", 3)(this, ModAPI.util.asClass(EntityPlayer.class), ${this.tags.watchDistance}));` : ""}
+            ${this.tags.canFollowParent ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIFollowParent", 2)(this, ${this.tags.followParentSpeed}));` : ''}
+            ${this.tags.canWander ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIWander", 2)(this, ${this.tags.wanderSpeed}));` : ''}
+            ${this.tags.canWatchPlayer ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIWatchClosest", 3)(this, ModAPI.util.asClass(EntityPlayer.class), ${this.tags.watchDistance}));` : ''}
             this.wrapped.tasks.addTask(taskId++, AITask("EntityAILookIdle", 1)(this));
         };
 
@@ -159,38 +161,45 @@ PRIMITIVES["mob"] = {
             return this.wrapped.height;
         };
 
-        const origApplyEntityAttributes = CustomEntity.prototype.$applyEntityAttributes;
+        const originalApplyEntityAttributes = CustomEntity.prototype.$applyEntityAttributes;
         CustomEntity.prototype.$applyEntityAttributes = function () {
             this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
-            origApplyEntityAttributes.apply(this, []);
+            originalApplyEntityAttributes.apply(this, []);
             this.wrapped.getEntityAttribute(SharedMonsterAttributes.maxHealth).setBaseValue(${this.tags.maxHealth});
             this.wrapped.getEntityAttribute(SharedMonsterAttributes.movementSpeed).setBaseValue(${this.tags.movementSpeed});
         };
 
-        const origLivingUpdate = CustomEntity.prototype.$onLivingUpdate;
+        const originalLivingUpdate = CustomEntity.prototype.$onLivingUpdate;
         CustomEntity.prototype.$onLivingUpdate = function () {
             this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
-            origLivingUpdate.apply(this, []);
+            originalLivingUpdate.apply(this, []);
             ${this.tags.canSwim ? `
             if (this.wrapped.isInWater()) {
                 this.wrapped.motionY *= 0.5;
                 this.wrapped.getEntityAttribute(SharedMonsterAttributes.movementSpeed).setBaseValue(${this.tags.swimSpeed});
             } else {
                 this.wrapped.getEntityAttribute(SharedMonsterAttributes.movementSpeed).setBaseValue(${this.tags.movementSpeed});
-            }` : ""}
+            }
+            ` : ''}
         };
 
-        CustomEntity.prototype.$getLivingSound = function () { return ModAPI.util.str("${livingSound}"); };
-        CustomEntity.prototype.$getHurtSound   = function () { return ModAPI.util.str("${hurtSound}"); };
-        CustomEntity.prototype.$getDeathSound  = function () { return ModAPI.util.str("${deathSound}"); };
-        CustomEntity.prototype.$playStepSound  = function () {
+        CustomEntity.prototype.$getLivingSound = function () {
+            return ModAPI.util.str("${this.tags.livingSound}");
+        };
+        CustomEntity.prototype.$getHurtSound = function () {
+            return ModAPI.util.str("${this.tags.hurtSound}");
+        };
+        CustomEntity.prototype.$getDeathSound = function () {
+            return ModAPI.util.str("${this.tags.deathSound}");
+        };
+        CustomEntity.prototype.$playStepSound = function () {
             this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
-            this.wrapped.playSound(ModAPI.util.str("${stepSound}"), ${this.tags.stepVolume}, 1);
+            this.wrapped.playSound(ModAPI.util.str("${this.tags.stepSound}"), ${this.tags.stepVolume}, 1);
         };
         CustomEntity.prototype.$getDropItem = function () {
             return (ModAPI.items["${this.tags.dropItem}"] || ModAPI.items.leather).getRef();
         };
-        CustomEntity.prototype.$createChild = function () {
+        CustomEntity.prototype.$createChild = function (otherParent) {
             this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
             return new CustomEntity(this.wrapped.worldObj ? this.wrapped.worldObj.getRef() : null);
         };
@@ -199,23 +208,31 @@ PRIMITIVES["mob"] = {
             return itemstack !== null && itemstack.$getItem() === breedItem;
         };
 
-        // ── Model ─────────────────────────────────────────────────────────
+        // ==== MODEL ====
         var modelClass = ModAPI.reflect.getClassById("${modelClassId}");
         var modelSuper = ModAPI.reflect.getSuper(modelClass);
-        var CustomModel = function CustomModel() { modelSuper(this); };
+        var CustomModel = function CustomModel() {
+            modelSuper(this);
+        };
         ModAPI.reflect.prototypeStack(modelClass, CustomModel);
 
-        // ── Renderer ──────────────────────────────────────────────────────
+        // ==== RENDERER ====
         var renderClass = ModAPI.reflect.getClassById("net.minecraft.client.renderer.entity.RenderLiving");
         var renderSuper = ModAPI.reflect.getSuper(renderClass, (x) => x.length === 4);
         const mobTextures = ResourceLocation(ModAPI.util.str("textures/entity/${this.tags.id}.png"));
-        var CustomRender = function CustomRender(rm, m, s) { renderSuper(this, rm, m, s); };
-        ModAPI.reflect.prototypeStack(renderClass, CustomRender);
-        CustomRender.prototype.$getEntityTexture = function () { return mobTextures; };
 
-        // ── Registration ──────────────────────────────────────────────────
+        var CustomRender = function CustomRender(renderManager, modelBaseIn, shadowSizeIn) {
+            renderSuper(this, renderManager, modelBaseIn, shadowSizeIn);
+        };
+        ModAPI.reflect.prototypeStack(renderClass, CustomRender);
+        CustomRender.prototype.$getEntityTexture = function () {
+            return mobTextures;
+        };
+
+        // ==== ENTITY REGISTRATION ====
         var ID = ModAPI.keygen.entity("${this.tags.id}");
-        ModAPI.reflect.getClassById("net.minecraft.entity.EntityList")
+        ModAPI.reflect
+            .getClassById("net.minecraft.entity.EntityList")
             .staticMethods.addMapping0.method(
                 ModAPI.util.asClass(CustomEntity),
                 { $createEntity: function (w) { return new CustomEntity(w); } },
@@ -225,25 +242,43 @@ PRIMITIVES["mob"] = {
                 ${this.tags.spawnEggSpotColor}
             );
 
-        const SpawnPlacementType = ModAPI.reflect.getClassById("net.minecraft.entity.EntityLiving$SpawnPlacementType").staticVariables;
+        // spawn placement
+        const SpawnPlacementType = ModAPI.reflect
+            .getClassById("net.minecraft.entity.EntityLiving$SpawnPlacementType")
+            .staticVariables;
         const ENTITY_PLACEMENTS = ModAPI.util.wrap(
-            ModAPI.reflect.getClassById("net.minecraft.entity.EntitySpawnPlacementRegistry").staticVariables.ENTITY_PLACEMENTS
+            ModAPI.reflect
+                .getClassById("net.minecraft.entity.EntitySpawnPlacementRegistry")
+                .staticVariables.ENTITY_PLACEMENTS
         );
         ENTITY_PLACEMENTS.put(ModAPI.util.asClass(CustomEntity), SpawnPlacementType.ON_GROUND);
 
+        // biome spawning (Duck-style)
         ModAPI.addEventListener("bootstrap", () => {
             const SpawnListEntry = ModAPI.reflect
                 .getClassById("net.minecraft.world.biome.BiomeGenBase$SpawnListEntry")
                 .constructors.find(x => x.length === 4);
-            ${this.tags.spawnInBiomes.map(biome => biomeMapping[biome] ? `
+
+            ${this.tags.spawnInBiomes.map(biome =>
+                biomeMapping[biome] ? `
             const Biome_${biome} = ModAPI.util.wrap(
-                ModAPI.reflect.getClassById("net.minecraft.world.biome.BiomeGenBase").staticVariables.${biomeMapping[biome]}
+                ModAPI.reflect
+                    .getClassById("net.minecraft.world.biome.BiomeGenBase")
+                    .staticVariables.${biomeMapping[biome]}
             );
-            Biome_${biome}.spawnableCreatureList.add(SpawnListEntry(
-                ModAPI.util.asClass(CustomEntity), ${this.tags.spawnWeight}, ${this.tags.spawnMinGroup}, ${this.tags.spawnMaxGroup}
-            ));` : "").join("")}
+            Biome_${biome}.spawnableCreatureList.add(
+                SpawnListEntry(
+                    ModAPI.util.asClass(CustomEntity),
+                    ${this.tags.spawnWeight},
+                    ${this.tags.spawnMinGroup},
+                    ${this.tags.spawnMaxGroup}
+                )
+            );
+            ` : ""
+            ).join("")}
         });
 
+        // localization key
         ModAPI.addEventListener("lib:asyncsink", () => {
             AsyncSink.L10N.set("entity.${this.tags.id}.name", "${this.tags.name}");
         });
@@ -251,9 +286,10 @@ PRIMITIVES["mob"] = {
         return { CustomEntity, CustomModel, CustomRender, mobTextures };
     }
 
-    ModAPI.dedicatedServer.appendCode(registerMob);
-    var mobData = registerMob();
+    ModAPI.dedicatedServer.appendCode(registerEntity);
+    var data = registerEntity();
 
+    // ==== RESOURCES & RENDER MAP ====
     ModAPI.addEventListener("lib:asyncsink", async () => {
         ${hasTexture ? `
         try {
@@ -262,8 +298,12 @@ PRIMITIVES["mob"] = {
                 await (await fetch("${this.tags.texture}")).arrayBuffer()
             );
             AsyncSink.hideFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/entity/${this.tags.id}.png.mcmeta");
-        } catch (e) { console.warn("Failed to load mob texture for ${this.tags.id}:", e); }
+        } catch(e) {
+            console.warn("Failed to load texture for ${this.tags.id}:", e);
+        }
         ` : ""}
+
+        await waitForRenderManager();
 
         ${hasIdleAudio ? `
         try {
@@ -271,70 +311,77 @@ PRIMITIVES["mob"] = {
                 "resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/idle.ogg",
                 await (await fetch("${this.tags.idleAudioFile}")).arrayBuffer()
             );
-            AsyncSink.Audio.register("${livingSound}", AsyncSink.Audio.Category.ANIMALS, [
+            AsyncSink.Audio.register("${this.tags.livingSound}", AsyncSink.Audio.Category.ANIMALS, [
                 { path: "sounds/mob/${this.tags.id}/idle.ogg", pitch: 1, volume: 1, streaming: false }
             ]);
-        } catch (e) {}
+        } catch(e) {}
         ` : ""}
+
         ${hasHurtAudio ? `
         try {
             AsyncSink.setFile(
                 "resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/hurt.ogg",
                 await (await fetch("${this.tags.hurtAudioFile}")).arrayBuffer()
             );
-            AsyncSink.Audio.register("${hurtSound}", AsyncSink.Audio.Category.ANIMALS, [
+            AsyncSink.Audio.register("${this.tags.hurtSound}", AsyncSink.Audio.Category.ANIMALS, [
                 { path: "sounds/mob/${this.tags.id}/hurt.ogg", pitch: 1, volume: 1, streaming: false }
             ]);
-        } catch (e) {}
+        } catch(e) {}
         ` : ""}
+
         ${hasDeathAudio ? `
         try {
             AsyncSink.setFile(
                 "resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/death.ogg",
                 await (await fetch("${this.tags.deathAudioFile}")).arrayBuffer()
             );
-            AsyncSink.Audio.register("${deathSound}", AsyncSink.Audio.Category.ANIMALS, [
+            AsyncSink.Audio.register("${this.tags.deathSound}", AsyncSink.Audio.Category.ANIMALS, [
                 { path: "sounds/mob/${this.tags.id}/death.ogg", pitch: 1, volume: 1, streaming: false }
             ]);
-        } catch (e) {}
+        } catch(e) {}
         ` : ""}
+
         ${hasStepAudio ? `
         try {
             AsyncSink.setFile(
                 "resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/step.ogg",
                 await (await fetch("${this.tags.stepAudioFile}")).arrayBuffer()
             );
-            AsyncSink.Audio.register("${stepSound}", AsyncSink.Audio.Category.ANIMALS, [
+            AsyncSink.Audio.register("${this.tags.stepSound}", AsyncSink.Audio.Category.ANIMALS, [
                 { path: "sounds/mob/${this.tags.id}/step.ogg", pitch: 1, volume: 1, streaming: false }
             ]);
-        } catch (e) {}
+        } catch(e) {}
         ` : ""}
 
-        await waitForRenderManager();
         try {
             ModAPI.mc.renderManager.entityRenderMap.put(
-                ModAPI.util.asClass(mobData.CustomEntity),
-                new mobData.CustomRender(ModAPI.mc.renderManager.getRef(), new mobData.CustomModel(), ${this.tags.shadowSize})
+                ModAPI.util.asClass(data.CustomEntity),
+                new data.CustomRender(
+                    ModAPI.mc.renderManager.getRef(),
+                    new data.CustomModel(),
+                    ${this.tags.shadowSize}
+                )
             );
-            await ModAPI.promisify(ModAPI.mc.renderEngine.bindTexture)(mobData.mobTextures);
-        } catch (e) { console.warn("Failed to register renderer for ${this.tags.id}:", e); }
+            await ModAPI.promisify(ModAPI.mc.renderEngine.bindTexture)(data.mobTextures);
+        } catch(e) {
+            console.warn("Failed to register renderer for ${this.tags.id}:", e);
+        }
     });
+})();
 
-    // ══════════════════════════════════════════════════════════════════════
-    // SPAWN EGG ITEM: ${eggName}  (${eggId})
-    // Registered as a normal item — usable in crafting recipes and furnace
-    // recipes just like any other item, e.g. result: "item/${eggId}"
-    // ══════════════════════════════════════════════════════════════════════
-    function registerSpawnEgg() {
+(function SpawnEggItemDatablock() {
+    const $$itemTexture = ${hasEggTexture ? `"${this.tags.spawnEggTexture}"` : `null`};
+
+    function $$ServersideItem() {
         var $$itemClass = ModAPI.reflect.getClassById("net.minecraft.item.Item");
         var $$itemSuper = ModAPI.reflect.getSuper($$itemClass, (x) => x.length === 1);
 
-        function $$SpawnEggItem() {
+        function $$CustomItem() {
             $$itemSuper(this);
         }
-        ModAPI.reflect.prototypeStack($$itemClass, $$SpawnEggItem);
+        ModAPI.reflect.prototypeStack($$itemClass, $$CustomItem);
 
-        $$SpawnEggItem.prototype.$onItemRightClick = function ($$itemstack, $$world, $$player) {
+        $$CustomItem.prototype.$onItemRightClick = function ($$itemstack, $$world, $$player) {
             if (!$$world.$isRemote) {
                 try {
                     var $$newMob = ModAPI.reflect
@@ -350,68 +397,82 @@ PRIMITIVES["mob"] = {
                             $$itemstack.$stackSize -= 1;
                         }
                     }
-                } catch (e) { console.warn("Spawn egg use failed for ${this.tags.id}:", e); }
+                } catch(e) {
+                    console.warn("Spawn egg use failed for ${this.tags.id}:", e);
+                }
             }
             return $$itemstack;
         };
 
-        function $$internalReg() {
-            var $$egg = (new $$SpawnEggItem()).$setUnlocalizedName(ModAPI.util.str("${eggId}"));
-            $$itemClass.staticMethods.registerItem.method(
-                ModAPI.keygen.item("${eggId}"),
-                ModAPI.util.str("${eggId}"),
-                $$egg
+        function $$internal_reg() {
+            var $$custom_item = (new $$CustomItem()).$setUnlocalizedName(
+                ModAPI.util.str("${eggId}")
             );
-            ModAPI.items["${eggId}"] = $$egg;
-            return $$egg;
+            $$itemClass.staticMethods.registerItem.method(ModAPI.keygen.item("${eggId}"), ModAPI.util.str("${eggId}"), $$custom_item);
+            ModAPI.items["${eggId}"] = $$custom_item;
+            return $$custom_item;
         }
-
-        if (ModAPI.items) return $$internalReg();
-        else ModAPI.addEventListener("bootstrap", $$internalReg);
+        if (ModAPI.items) {
+            return $$internal_reg();
+        } else {
+            ModAPI.addEventListener("bootstrap", $$internal_reg);
+        }
     }
 
-    ModAPI.dedicatedServer.appendCode(registerSpawnEgg);
-    var $$egg_item = registerSpawnEgg();
+    ModAPI.dedicatedServer.appendCode($$ServersideItem);
+    var $$custom_item = $$ServersideItem();
 
     ModAPI.addEventListener("lib:asyncsink", async () => {
         ModAPI.addEventListener("lib:asyncsink:registeritems", ($$renderItem) => {
-            $$renderItem.registerItem($$egg_item, ModAPI.util.str("${eggId}"));
+            $$renderItem.registerItem($$custom_item, ModAPI.util.str("${eggId}"));
         });
         AsyncSink.L10N.set("item.${eggId}.name", "${eggName}");
-
+        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/models/item/${eggId}.json", JSON.stringify(
+            ${hasEggTexture ? `
+            {
+                "parent": "builtin/generated",
+                "textures": {
+                    "layer0": "items/${eggId}"
+                },
+                "display": {
+                    "thirdperson": {
+                        "rotation": [-90, 0, 0],
+                        "translation": [0, 1, -3],
+                        "scale": [0.55, 0.55, 0.55]
+                    },
+                    "firstperson": {
+                        "rotation": [0, -135, 25],
+                        "translation": [0, 4, 2],
+                        "scale": [1.7, 1.7, 1.7]
+                    }
+                }
+            }` : `
+            {
+                "parent": "builtin/generated",
+                "textures": {
+                    "layer0": "items/spawn_egg",
+                    "layer1": "items/spawn_egg_overlay"
+                },
+                "display": {
+                    "thirdperson": {
+                        "rotation": [-90, 0, 0],
+                        "translation": [0, 1, -3],
+                        "scale": [0.55, 0.55, 0.55]
+                    },
+                    "firstperson": {
+                        "rotation": [0, -135, 25],
+                        "translation": [0, 4, 2],
+                        "scale": [1.7, 1.7, 1.7]
+                    }
+                }
+            }`}
+        ));
         ${hasEggTexture ? `
-        // Custom egg texture supplied
-        AsyncSink.setFile(
-            "resourcepacks/AsyncSinkLib/assets/minecraft/models/item/${eggId}.json",
-            JSON.stringify({
-                "parent": "builtin/generated",
-                "textures": { "layer0": "items/${eggId}" },
-                "display": {
-                    "thirdperson": { "rotation": [-90,0,0], "translation": [0,1,-3], "scale": [0.55,0.55,0.55] },
-                    "firstperson": { "rotation": [0,-135,25], "translation": [0,4,2], "scale": [1.7,1.7,1.7] }
-                }
-            })
-        );
-        AsyncSink.setFile(
-            "resourcepacks/AsyncSinkLib/assets/minecraft/textures/items/${eggId}.png",
-            await (await fetch("${this.tags.spawnEggTexture}")).arrayBuffer()
-        );
-        ` : `
-        // No custom texture — reuse vanilla spawn_egg layers tinted by the mob's egg colors
-        AsyncSink.setFile(
-            "resourcepacks/AsyncSinkLib/assets/minecraft/models/item/${eggId}.json",
-            JSON.stringify({
-                "parent": "builtin/generated",
-                "textures": { "layer0": "items/spawn_egg", "layer1": "items/spawn_egg_overlay" },
-                "display": {
-                    "thirdperson": { "rotation": [-90,0,0], "translation": [0,1,-3], "scale": [0.55,0.55,0.55] },
-                    "firstperson": { "rotation": [0,-135,25], "translation": [0,4,2], "scale": [1.7,1.7,1.7] }
-                }
-            })
-        );
-        `}
+        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/items/${eggId}.png", await (await fetch(
+            $$itemTexture
+        )).arrayBuffer());
+        ` : ""}
     });
-
 })();`;
     }
 };
