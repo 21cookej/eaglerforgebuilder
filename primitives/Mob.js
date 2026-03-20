@@ -35,16 +35,17 @@ PRIMITIVES["mob"] = {
         breedingItem: "wheat",
         dropItem: "leather",
 
-        // egg colors
+        // egg colors (used when no custom egg texture is uploaded)
         spawnEggBaseColor: 0x5e3e2d,
         spawnEggSpotColor: 0x269166,
 
-        // optional custom spawn egg texture - if left as VALUE_ENUMS.IMG (no upload),
-        // the egg will use the vanilla spawn_egg model tinted with the colors above
+        // optional custom spawn egg texture (base64 IMG)
+        // if left unset (no upload), uses vanilla spawn_egg model tinted with colors above
         spawnEggTexture: VALUE_ENUMS.IMG,
 
-        // spawning
-        spawnInBiomes: ["plains", "forest", "swampland", "river", "beach"],
+        // spawning - comma separated list of biomes
+        // valid values: plains,desert,forest,taiga,swampland,river,beach,jungle
+        spawnInBiomes: "plains,forest,swampland,river,beach",
         spawnWeight: 10,
         spawnMinGroup: 2,
         spawnMaxGroup: 4,
@@ -56,11 +57,11 @@ PRIMITIVES["mob"] = {
         stepSound: "mob.custom.step",
         stepVolume: 0.15,
 
-        // files (base64)
-        idleAudioFile: VALUE_ENUMS.AUDIO,
-        hurtAudioFile: VALUE_ENUMS.AUDIO,
-        deathAudioFile: VALUE_ENUMS.AUDIO,
-        stepAudioFile: VALUE_ENUMS.AUDIO
+        // audio files (base64) - use VALUE_ENUMS.FILE
+        idleAudioFile: VALUE_ENUMS.FILE,
+        hurtAudioFile: VALUE_ENUMS.FILE,
+        deathAudioFile: VALUE_ENUMS.FILE,
+        stepAudioFile: VALUE_ENUMS.FILE
     },
     getDependencies: function () {
         return [];
@@ -96,6 +97,12 @@ PRIMITIVES["mob"] = {
         };
 
         const modelClassId = modelMapping[this.tags.modelType] || "net.minecraft.client.model.ModelChicken";
+
+        // spawnInBiomes is stored as a comma-separated string (not an array, because arrays
+        // get collapsed to their first element by getPrimitive's dropdown logic)
+        const spawnInBiomes = typeof this.tags.spawnInBiomes === "string"
+            ? this.tags.spawnInBiomes.split(",").map(s => s.trim()).filter(s => s.length > 0)
+            : [];
 
         const eggId = this.tags.id + "_spawn_egg";
         const eggName = this.tags.name + " Spawn Egg";
@@ -259,7 +266,7 @@ PRIMITIVES["mob"] = {
                 .getClassById("net.minecraft.world.biome.BiomeGenBase$SpawnListEntry")
                 .constructors.find(x => x.length === 4);
 
-            ${this.tags.spawnInBiomes.map(biome =>
+            ${spawnInBiomes.map(biome =>
                 biomeMapping[biome] ? `
             const Biome_${biome} = ModAPI.util.wrap(
                 ModAPI.reflect
@@ -368,11 +375,11 @@ PRIMITIVES["mob"] = {
         }
     });
 })();
-
-(function SpawnEggItemDatablock() {
-    const $$itemTexture = ${hasEggTexture ? `"${this.tags.spawnEggTexture}"` : `null`};
+(function SpawnEggDatablock() {
+    const $$eggTexture = "${this.tags.spawnEggTexture}";
 
     function $$ServersideItem() {
+        const $$scoped_efb_globals = {};
         var $$itemClass = ModAPI.reflect.getClassById("net.minecraft.item.Item");
         var $$itemSuper = ModAPI.reflect.getSuper($$itemClass, (x) => x.length === 1);
 
@@ -428,48 +435,30 @@ PRIMITIVES["mob"] = {
         });
         AsyncSink.L10N.set("item.${eggId}.name", "${eggName}");
         AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/models/item/${eggId}.json", JSON.stringify(
-            ${hasEggTexture ? `
-            {
+            ${hasEggTexture ? `{
                 "parent": "builtin/generated",
                 "textures": {
                     "layer0": "items/${eggId}"
                 },
                 "display": {
-                    "thirdperson": {
-                        "rotation": [-90, 0, 0],
-                        "translation": [0, 1, -3],
-                        "scale": [0.55, 0.55, 0.55]
-                    },
-                    "firstperson": {
-                        "rotation": [0, -135, 25],
-                        "translation": [0, 4, 2],
-                        "scale": [1.7, 1.7, 1.7]
-                    }
+                    "thirdperson": { "rotation": [-90, 0, 0], "translation": [0, 1, -3], "scale": [0.55, 0.55, 0.55] },
+                    "firstperson": { "rotation": [0, -135, 25], "translation": [0, 4, 2], "scale": [1.7, 1.7, 1.7] }
                 }
-            }` : `
-            {
+            }` : `{
                 "parent": "builtin/generated",
                 "textures": {
                     "layer0": "items/spawn_egg",
                     "layer1": "items/spawn_egg_overlay"
                 },
                 "display": {
-                    "thirdperson": {
-                        "rotation": [-90, 0, 0],
-                        "translation": [0, 1, -3],
-                        "scale": [0.55, 0.55, 0.55]
-                    },
-                    "firstperson": {
-                        "rotation": [0, -135, 25],
-                        "translation": [0, 4, 2],
-                        "scale": [1.7, 1.7, 1.7]
-                    }
+                    "thirdperson": { "rotation": [-90, 0, 0], "translation": [0, 1, -3], "scale": [0.55, 0.55, 0.55] },
+                    "firstperson": { "rotation": [0, -135, 25], "translation": [0, 4, 2], "scale": [1.7, 1.7, 1.7] }
                 }
             }`}
         ));
         ${hasEggTexture ? `
         AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/items/${eggId}.png", await (await fetch(
-            $$itemTexture
+            $$eggTexture
         )).arrayBuffer());
         ` : ""}
     });
