@@ -12,6 +12,7 @@ body {
   color: var(--col);
   text-shadow: 0px 0px 5px rgba(0, 0, 0, 0.5);
   overflow: hidden;
+  font-size: 0.8rem;
 }
 h1,
 h2,
