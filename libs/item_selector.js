@@ -395,16 +395,139 @@ const items = [
         "id": "glowstone_dust",
         "type": "item"
     },
+    // Fish variants (item id: fish, damage 0-3)
     {
         "id": "fish",
+        "meta": 0,
+        "display": "raw_fish",
+        "type": "item"
+    },
+    {
+        "id": "fish",
+        "meta": 1,
+        "display": "raw_salmon",
+        "type": "item"
+    },
+    {
+        "id": "fish",
+        "meta": 2,
+        "display": "clownfish",
+        "type": "item"
+    },
+    {
+        "id": "fish",
+        "meta": 3,
+        "display": "pufferfish",
+        "type": "item"
+    },
+    // Cooked fish variants (item id: cooked_fish, damage 0-1)
+    {
+        "id": "cooked_fish",
+        "meta": 0,
+        "display": "cooked_fish",
         "type": "item"
     },
     {
         "id": "cooked_fish",
+        "meta": 1,
+        "display": "cooked_salmon",
+        "type": "item"
+    },
+    // Dye variants (item id: dye, damage 0-15)
+    {
+        "id": "dye",
+        "meta": 0,
+        "display": "ink_sac",
         "type": "item"
     },
     {
         "id": "dye",
+        "meta": 1,
+        "display": "rose_red",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 2,
+        "display": "cactus_green",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 3,
+        "display": "cocoa_beans",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 4,
+        "display": "lapis_lazuli",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 5,
+        "display": "purple_dye",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 6,
+        "display": "cyan_dye",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 7,
+        "display": "light_gray_dye",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 8,
+        "display": "gray_dye",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 9,
+        "display": "pink_dye",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 10,
+        "display": "lime_dye",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 11,
+        "display": "dandelion_yellow",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 12,
+        "display": "light_blue_dye",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 13,
+        "display": "magenta_dye",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 14,
+        "display": "orange_dye",
+        "type": "item"
+    },
+    {
+        "id": "dye",
+        "meta": 15,
+        "display": "bone_meal",
         "type": "item"
     },
     {
@@ -519,8 +642,180 @@ const items = [
         "id": "nether_wart",
         "type": "item"
     },
+    // Potions (item id: potionitem, damage values encode effect)
     {
         "id": "potionitem",
+        "meta": 0,
+        "display": "water_bottle",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8192,
+        "display": "mundane_potion",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 32,
+        "display": "thick_potion",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 16,
+        "display": "awkward_potion",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8230,
+        "display": "potion_of_night_vision",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8238,
+        "display": "potion_of_invisibility",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8235,
+        "display": "potion_of_leaping",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8259,
+        "display": "potion_of_fire_resistance",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8226,
+        "display": "potion_of_swiftness",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8234,
+        "display": "potion_of_slowness",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8269,
+        "display": "potion_of_water_breathing",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8261,
+        "display": "potion_of_healing",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8268,
+        "display": "potion_of_harming",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8196,
+        "display": "potion_of_poison",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8193,
+        "display": "potion_of_regeneration",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8201,
+        "display": "potion_of_strength",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 8232,
+        "display": "potion_of_weakness",
+        "type": "item"
+    },
+    // Splash potions (damage | 0x4000 = 16384)
+    {
+        "id": "potionitem",
+        "meta": 16454,
+        "display": "splash_potion_of_night_vision",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 16462,
+        "display": "splash_potion_of_invisibility",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 16459,
+        "display": "splash_potion_of_leaping",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 16483,
+        "display": "splash_potion_of_fire_resistance",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 16450,
+        "display": "splash_potion_of_swiftness",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 16458,
+        "display": "splash_potion_of_slowness",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 16485,
+        "display": "splash_potion_of_healing",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 16492,
+        "display": "splash_potion_of_harming",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 16420,
+        "display": "splash_potion_of_poison",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 16417,
+        "display": "splash_potion_of_regeneration",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 16425,
+        "display": "splash_potion_of_strength",
+        "type": "item"
+    },
+    {
+        "id": "potionitem",
+        "meta": 16456,
+        "display": "splash_potion_of_weakness",
         "type": "item"
     },
     {
@@ -559,8 +854,167 @@ const items = [
         "id": "speckled_melon",
         "type": "item"
     },
+    // Spawn eggs (item id: spawn_egg, damage = entity ID in 1.8)
     {
         "id": "spawn_egg",
+        "meta": 50,
+        "display": "creeper_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 51,
+        "display": "skeleton_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 52,
+        "display": "spider_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 54,
+        "display": "zombie_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 55,
+        "display": "slime_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 56,
+        "display": "ghast_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 57,
+        "display": "zombie_pigman_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 58,
+        "display": "enderman_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 59,
+        "display": "cave_spider_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 60,
+        "display": "silverfish_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 61,
+        "display": "blaze_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 62,
+        "display": "magma_cube_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 65,
+        "display": "bat_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 66,
+        "display": "witch_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 67,
+        "display": "endermite_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 68,
+        "display": "guardian_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 90,
+        "display": "pig_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 91,
+        "display": "sheep_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 92,
+        "display": "cow_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 93,
+        "display": "chicken_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 94,
+        "display": "squid_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 95,
+        "display": "wolf_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 96,
+        "display": "mooshroom_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 98,
+        "display": "ocelot_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 100,
+        "display": "horse_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 101,
+        "display": "rabbit_spawn_egg",
+        "type": "item"
+    },
+    {
+        "id": "spawn_egg",
+        "meta": 120,
+        "display": "villager_spawn_egg",
         "type": "item"
     },
     {
@@ -2544,7 +2998,19 @@ const IMAGE_HOST = [
 const animatedList = ["command_block", "prismarine", "sea_lantern", "written_book", "compass", "clock", "Bottle_o%27_Enchanting", "nether_star", "enchanted_book"];
 const emptyTexture = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=";
 const missingTexture = IMAGE_HOST + "Missing_Texture_JE4.png";
-var itemToRep = (item) => (item.type === "block") ? "block/" + item.id + "@" + item.meta : "item/" + item.id;
+
+/**
+ * Converts an item/block entry to its canonical representation string.
+ * For blocks:  "block/<id>@<meta>"
+ * For items with meta (variants):  "item/<id>@<meta>"
+ * For plain items: "item/<id>"
+ */
+var itemToRep = (item) => {
+    if (item.type === "block") return "block/" + item.id + "@" + item.meta;
+    if (item.meta !== undefined) return "item/" + item.id + "@" + item.meta;
+    return "item/" + item.id;
+};
+
 function blockL10NToId(thisSentence, noReverse) {
     function camelToSnake(str) {
         return str.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
@@ -2556,7 +3022,20 @@ function blockL10NToId(thisSentence, noReverse) {
     let reversedSnakeCase = noReverse ? snakeCase : reverseString(snakeCase);
     return reversedSnakeCase;
 }
+
+/**
+ * Returns the wiki image slug for an item entry.
+ * Items with a "display" field use that directly.
+ * Items with meta but no display fall back to id-based logic.
+ */
 function getImageLocationItem(item, display) {
+    // Custom display override — used for dye variants, spawn eggs, fish, potions etc.
+    if (item.display) {
+        // For display mode (label in selector), return the human-readable display name.
+        // For image lookup, use the display name as the image slug.
+        return item.display;
+    }
+
     if ((item.name === "missingno") && !display) {
         var tex = state.nodes.find(x => x.type === "item" && x.tags.id == item.id)?.tags?.texture;
         if (!tex || tex.startsWith("efb::")) {
@@ -2575,7 +3054,9 @@ function getImageLocationItem(item, display) {
     item.id = item.id.replace("writable_book", "book_and_quill");
     item.id = item.id.replace("reeds", "sugar_cane");
     item.id = item.id.replace("bed", "red_bed");
+    // dye without meta falls back to lime_dye for display, water_bottle for image
     item.id = !display ? item.id.replace("dye", "lime_dye") : item.id;
+    // spawn_egg without meta: blank egg
     item.id = !display ? item.id.replace("spawn_egg", "blank_spawn_egg") : item.id;
     item.id = item.id.replace("repeater", "redstone_repeater");
     item.id = item.id.replace("comparator", "redstone_comparator");
@@ -2583,6 +3064,7 @@ function getImageLocationItem(item, display) {
     item.id = item.id.replace("sign", "oak_sign");
     item.id = (item.id === "porkchop") ? "raw_porkchop" : item.id;
     item.id = (item.id === "fish") ? "raw_fish" : item.id;
+    item.id = (item.id === "cooked_fish") ? "cooked_fish" : item.id;
     item.id = (item.id === "map") ? "empty_map" : item.id;
     item.id = (item.id === "filled_map") ? "map" : item.id;
     item.id = (item.id === "mutton") ? "raw_mutton" : item.id;
@@ -2604,6 +3086,7 @@ function getImageLocationItem(item, display) {
     item.id = (item.id === "quartz") ? "nether_quartz" : item.id;
     return item.id;
 }
+
 function getImageLocationBlock(block, display) {
     if ((block.name === "missingno") && !display) {
         var tex = state.nodes.find(x => x.type === "block_advanced" && x.tags.id == block.id)?.tags?.texture;
@@ -2741,6 +3224,7 @@ function getImageLocationBlock(block, display) {
             return block.id;
     }
 }
+
 function getImageLocation(id) {
     if (id.startsWith("data:")) {
         return id;
@@ -2753,6 +3237,7 @@ function getImageLocation(id) {
     }
     return `${IMAGE_HOST}Invicon_${id.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join('_').replaceAll("Of", "of").replaceAll("O%27", "o%27").replaceAll("With", "with").replace("_And_", "_and_").replace("On_A", "on_a")}.${animatedList.includes(id) ? "gif" : "png"}`;
 }
+
 function makeItemSelector(selected, useBlocks, triggerFn, options) {
     options ||= {};
     var conf = {
@@ -2901,7 +3386,14 @@ function makeItemSelector(selected, useBlocks, triggerFn, options) {
                 div.style.backgroundImage = `url(${getImageLocation((item.type === "block") ? getImageLocationBlock(item) : getImageLocationItem(item))})`;
             });
             var label = document.createElement("label");
-            label.innerText = (item.type === "block") ? getImageLocationBlock(item, true).replaceAll("%27", "'") : getImageLocationItem(item, true);
+            // Label: prefer display name, else block display name, else item id
+            if (item.display) {
+                label.innerText = item.display.replaceAll("%27", "'").replaceAll("_", " ");
+            } else if (item.type === "block") {
+                label.innerText = getImageLocationBlock(item, true).replaceAll("%27", "'");
+            } else {
+                label.innerText = getImageLocationItem(item, true);
+            }
             if (conf.noMeta) {
                 label.innerText = item.id;
             }
