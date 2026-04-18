@@ -28,6 +28,9 @@ PRIMITIVES["recipe"] = {
         }).dynamicConcat("item", "id", (x) => {
             return "item/" + x
         }).calculate());
+
+        // We need to strip the @meta suffix when looking up dependencies
+        // so "item/dye@4" correctly matches a custom item "item/dye"
         const possibleDepsList = new Set([
             this.tags.slot0,
             this.tags.slot1,
@@ -40,16 +43,25 @@ PRIMITIVES["recipe"] = {
             this.tags.slot8,
             this.tags.result
         ]);
-        const deps = [...matchesList.intersection(possibleDepsList)].map(x => {
-            if (x.startsWith("block/")) {
-                x = x.replace("block/", "").split("@");
-                x = x[0];
-                return state.nodes.find(y => (y.type === "block_advanced") && (y.tags.id === x))
-            } else {
-                x = x.replace("item/", "");
-                return state.nodes.find(y => (y.type === "item") && (y.tags.id === x))
+
+        const deps = [];
+        possibleDepsList.forEach(entry => {
+            if (!entry || entry === VALUE_ENUMS.ABSTRACT_ITEM || entry === "item/air") return;
+
+            // Strip @meta for dependency lookup
+            const baseEntry = entry.split("@")[0];
+
+            if (baseEntry.startsWith("block/")) {
+                const id = baseEntry.replace("block/", "");
+                const dep = state.nodes.find(y => y.type === "block_advanced" && y.tags.id === id);
+                if (dep) deps.push(dep);
+            } else if (baseEntry.startsWith("item/")) {
+                const id = baseEntry.replace("item/", "");
+                const dep = state.nodes.find(y => y.type === "item" && y.tags.id === id);
+                if (dep) deps.push(dep);
             }
         });
+
         return deps;
     },
     asJavaScript: function () {
@@ -94,22 +106,41 @@ PRIMITIVES["recipe"] = {
         const uniqueTypesMapReverse = Object.fromEntries([...new Set(newGrid.flat())].filter(x => x !== "item/air").map((x, i) => {
             return [String.fromCharCode(65 + i), x];
         }));
+
+        /**
+         * Parse a slot entry like "item/dye@4" or "block/wool@3" into parts.
+         * Returns { type: "item"|"block", id: string, meta: number }
+         */
+        function parseSlotEntry(entry) {
+            if (!entry || entry === "item/air") return { type: "item", id: "air", meta: 0 };
+            const atIdx = entry.lastIndexOf("@");
+            const meta = atIdx !== -1 ? (parseInt(entry.slice(atIdx + 1)) || 0) : 0;
+            const base = atIdx !== -1 ? entry.slice(0, atIdx) : entry;
+            const slashIdx = base.indexOf("/");
+            const type = base.slice(0, slashIdx);
+            const id = base.slice(slashIdx + 1);
+            return { type, id, meta };
+        }
+
         var legendStr = "";
         const ks = Object.keys(uniqueTypesMapReverse);
         ks.forEach((k, i) => {
+            const parsed = parseSlotEntry(uniqueTypesMapReverse[k]);
+
             if (flags.target === "1_12") {
                 legendStr += `"${k}": {
-                item: "minecraft:${uniqueTypesMapReverse[k].split("/")[1].split("@")[0]}",
-                ${uniqueTypesMapReverse[k].includes("@") ? `data: ${parseInt(uniqueTypesMapReverse[k].split("/")[1].split("@")[1]) || 0}` : ""}
+                item: "minecraft:${parsed.id}",
+                ${parsed.meta !== 0 ? `data: ${parsed.meta}` : ""}
             }${ks.length === (i+1) ? "" : ","}`
             } else {
                 legendStr += `"${k}": {
-                type: "${uniqueTypesMapReverse[k].split("/")[0]}",
-                id: "${uniqueTypesMapReverse[k].split("/")[1].split("@")[0]}",
-                ${uniqueTypesMapReverse[k].includes("@") ? `meta: ${parseInt(uniqueTypesMapReverse[k].split("/")[1].split("@")[1]) || 0}` : ""}
+                type: "${parsed.type}",
+                id: "${parsed.id}",
+                ${parsed.meta !== 0 ? `meta: ${parsed.meta}` : ""}
             }${ks.length === (i+1) ? "" : ","}`
             }
         });
+
         var $$recipePattern = "";
         for (let y = 0; y < newGrid.length; y++) {
             const row = newGrid[y];
@@ -121,7 +152,12 @@ PRIMITIVES["recipe"] = {
             $$recipePattern += '"';
             $$recipePattern += ",";
         }
+
+        // Parse the result entry
+        const resultParsed = parseSlotEntry(this.tags.result.replace("item/air", "block/air"));
+
         var modifyResultHandler = getHandlerCode("CraftingRecipeModifyResult", this.tags.ModifyResult, ["$$itemstack"]);
+
         if (flags.target === "1_12") {
             return `(function CraftingRecipeDatablock112() {
 
@@ -135,7 +171,7 @@ PRIMITIVES["recipe"] = {
         const CraftingManager = ModAPI.reflect.getClassByName("CraftingManager");
         const CraftingManagerMethods = CraftingManager.staticMethods;
         const jsonData = parseJson(ModAPI.util.str(\`{
-            "type": "crafting_shaped", ${/*/or crafting_shapeless/*/""}
+            "type": "crafting_shaped",
             "pattern": [
     ${$$recipePattern}
   ],
@@ -143,13 +179,13 @@ PRIMITIVES["recipe"] = {
     ${legendStr}
   },
   "result": {
-    "item": "minecraft:${this.tags.result.split("/")[1].split("@")[0]}",
-    "data": ${this.tags.result.split("/")[1].split("@")[1] || "0"},
+    "item": "minecraft:${resultParsed.id}",
+    "data": ${resultParsed.meta},
     "count": ${this.tags.resultQuantity}
   }
             }\`.trim()));
-        const recipeObj = CraftingManagerMethods.func_193376_a.method(jsonData); //convert json to an IRecipe
-        CraftingManagerMethods.func_193379_a.method(ModAPI.util.str("coolrecipeid"), recipeObj); //register recipe under resource location
+        const recipeObj = CraftingManagerMethods.func_193376_a.method(jsonData);
+        CraftingManagerMethods.func_193379_a.method(ModAPI.util.str("coolrecipeid"), recipeObj);
     }
 
     ModAPI.dedicatedServer.appendCode(registerRecipe);
@@ -157,6 +193,50 @@ PRIMITIVES["recipe"] = {
 })();
 `;
         } else {
+            // 1.8 recipe — build ingredient list with meta support
+            // For each legend entry we need to handle item meta (damage value).
+            // ItemStack constructors:
+            //   [2] = (Block block, int amount, int meta)  — for blocks
+            //   [4] = (Item item, int amount)              — for items (no meta)
+            // For items WITH meta we use constructor [1] = (Item item, int amount, int meta)
+            //   but to be safe we set itemDamage after construction if [1] doesn't exist.
+
+            // Build per-key ingredient code as a JS snippet that will be evaluated at runtime.
+            // We embed a helper that picks the right constructor.
+            const legendEntriesCode = ks.map(k => {
+                const parsed = parseSlotEntry(uniqueTypesMapReverse[k]);
+                if (parsed.type === "block") {
+                    return `"${k}": (function(){
+                var $$blk = ModAPI.blocks["${parsed.id}"]?.getRef();
+                if (!$$blk) return null;
+                return $$itemStackFromBlockWithMeta($$blk, 1, ${parsed.meta});
+            })()`;
+                } else {
+                    if (parsed.meta !== 0) {
+                        // Item with metadata — use the 3-arg item constructor (index 1: Item, count, meta)
+                        // or fall back to setting itemDamage manually
+                        return `"${k}": (function(){
+                var $$itm = ModAPI.items["${parsed.id}"]?.getRef();
+                if (!$$itm) return null;
+                var $$stk;
+                var $$ctor3 = ModAPI.reflect.getClassById("net.minecraft.item.ItemStack").constructors[1];
+                if ($$ctor3 && $$ctor3.length === 3) {
+                    $$stk = $$ctor3($$itm, 1, ${parsed.meta});
+                } else {
+                    $$stk = $$itemStackFromItem($$itm, 1);
+                    if ($$stk) $$stk.$itemDamage = ${parsed.meta};
+                }
+                return $$stk;
+            })()`;
+                    } else {
+                        return `"${k}": (function(){
+                var $$itm = ModAPI.items["${parsed.id}"]?.getRef();
+                return $$itm ? $$itemStackFromItem($$itm, 1) : null;
+            })()`;
+                    }
+                }
+            }).join(",\n");
+
             return `(function CraftingRecipeDatablock() {
     function $$registerRecipe() {
         function $$internalRegister() {
@@ -165,34 +245,54 @@ PRIMITIVES["recipe"] = {
             function $$ToChar(char) {
                 return ModAPI.reflect.getClassById("java.lang.Character").staticMethods.valueOf.method(char[0].charCodeAt(0));
             }
-            var $$resultItemArg = "${this.tags.result.replace("item/air", "block/air")}";
-            var $$recipeLegend = {
-                ${legendStr}
-            };
-            var $$recipePattern = [
-                ${$$recipePattern}
-            ];
             var $$itemStackFromBlockWithMeta = ModAPI.reflect.getClassById("net.minecraft.item.ItemStack").constructors[2];
             var $$itemStackFromItem = ModAPI.reflect.getClassById("net.minecraft.item.ItemStack").constructors[4];
+
+            // Build ingredient map — each value is an ItemStack (or Item ref for legacy)
+            var $$recipeLegendStacks = {
+                ${legendEntriesCode}
+            };
+
             var $$recipeInternal = [];
-            Object.keys($$recipeLegend).forEach(($$key) => {
+            Object.keys($$recipeLegendStacks).forEach(($$key) => {
                 $$recipeInternal.push($$ToChar($$key));
-                var $$ingredient = ($$recipeLegend[$$key].type === "block" ? $$itemStackFromBlockWithMeta(ModAPI.blocks[$$recipeLegend[$$key].id].getRef(),1,$$recipeLegend[$$key].meta) : ModAPI.items[$$recipeLegend[$$key].id].getRef());
-                $$recipeInternal.push($$ingredient);
+                $$recipeInternal.push($$recipeLegendStacks[$$key]);
             });
 
-            var $$recipeContents = $$recipePattern.map(row => ModAPI.util.str(row));
+            var $$recipeContents = [${$$recipePattern}].map(row => ModAPI.util.str(row));
             var $$recipe = ModAPI.util.makeArray($$ObjectClass, $$recipeContents.concat($$recipeInternal));
 
-            var $$resultItem = $$resultItemArg.startsWith("block/") ?
-                ($$itemStackFromBlockWithMeta(ModAPI.blocks[$$resultItemArg.replace("block/", "").split("@")[0]].getRef(),${this.tags.resultQuantity},$$resultItemArg.replace("block/", "").split("@")[1] || 0))
-                : ($$itemStackFromItem(ModAPI.items[$$resultItemArg.replace("item/", "")].getRef(), ${this.tags.resultQuantity}));
+            // Build result ItemStack
+            var $$resultType = "${resultParsed.type}";
+            var $$resultId = "${resultParsed.id}";
+            var $$resultMeta = ${resultParsed.meta};
+            var $$resultQty = ${this.tags.resultQuantity};
+            var $$resultItem;
+            if ($$resultType === "block") {
+                var $$blk = ModAPI.blocks[$$resultId]?.getRef();
+                $$resultItem = $$blk ? $$itemStackFromBlockWithMeta($$blk, $$resultQty, $$resultMeta) : null;
+            } else {
+                var $$itm = ModAPI.items[$$resultId]?.getRef();
+                if ($$itm) {
+                    var $$ctor3 = ModAPI.reflect.getClassById("net.minecraft.item.ItemStack").constructors[1];
+                    if ($$resultMeta !== 0 && $$ctor3 && $$ctor3.length === 3) {
+                        $$resultItem = $$ctor3($$itm, $$resultQty, $$resultMeta);
+                    } else {
+                        $$resultItem = $$itemStackFromItem($$itm, $$resultQty);
+                        if ($$resultMeta !== 0 && $$resultItem) $$resultItem.$itemDamage = $$resultMeta;
+                    }
+                }
+            }
+
+            if (!$$resultItem) {
+                console.warn("EFB: Crafting recipe result item not found: " + $$resultId);
+                return;
+            }
             
             (function (${modifyResultHandler.args.join(",")}) {${modifyResultHandler.code}})($$resultItem);
             
             var $$craftingManager = ModAPI.reflect.getClassById("net.minecraft.item.crafting.CraftingManager").staticMethods.getInstance.method();
             ModAPI.hooks.methods.nmic_CraftingManager_addRecipe($$craftingManager, $$resultItem, $$recipe);
-            
         }
 
         if (ModAPI.items) {
