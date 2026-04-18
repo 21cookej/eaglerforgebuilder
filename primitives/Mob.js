@@ -35,32 +35,18 @@ PRIMITIVES["mob"] = {
         breedingItem: "wheat",
         dropItem: "leather",
 
-        // spawn egg as a NORMAL item
-        eggId: "custom_mob_spawn_egg",
-        eggName: "Custom Mob Spawn Egg",
-        eggTexture: VALUE_ENUMS.IMG, // item texture for the egg
-        eggMaxStackSize: 64,
-        eggCreativeTab: [
-            "tabMisc",
-            "tabBlock",
-            "tabDecorations",
-            "tabRedstone",
-            "tabTransport",
-            "tabAllSearch",
-            "tabFood",
-            "tabTools",
-            "tabCombat",
-            "tabBrewing",
-            "tabMaterials",
-            "tabInventory"
-        ]
+        // custom spawn egg texture (base64 IMG, like a normal item)
+        spawnEggTexture: VALUE_ENUMS.IMG,
+
+        // item-constructor handler for the spawn egg
+        Constructor: VALUE_ENUMS.ABSTRACT_HANDLER + "ItemConstructor"
     },
     getDependencies: function () {
         return [];
     },
     asJavaScript: function () {
-        const hasTexture = this.tags.texture && typeof this.tags.texture === "string" && this.tags.texture.startsWith("data:");
-        const hasEggTexture = this.tags.eggTexture && typeof this.tags.eggTexture === "string" && this.tags.eggTexture.startsWith("data:");
+        const hasMobTexture = this.tags.texture && typeof this.tags.texture === "string" && this.tags.texture.startsWith("data:");
+        const hasEggTexture = this.tags.spawnEggTexture && typeof this.tags.spawnEggTexture === "string" && this.tags.spawnEggTexture.startsWith("data:");
 
         const modelMapping = {
             "CHICKEN": "net.minecraft.client.model.ModelChicken",
@@ -73,7 +59,7 @@ PRIMITIVES["mob"] = {
             "SPIDER": "net.minecraft.client.model.ModelSpider"
         };
 
-        // vanilla-like sound keys for each model type
+        // vanilla sound keys per model type
         const soundMapping = {
             "CHICKEN": {
                 living: "mob.chicken.say",
@@ -136,8 +122,11 @@ PRIMITIVES["mob"] = {
         const modelClassId = modelMapping[this.tags.modelType] || "net.minecraft.client.model.ModelChicken";
         const sounds = soundMapping[this.tags.modelType] || soundMapping["CHICKEN"];
 
-        const eggId = this.tags.eggId || (this.tags.id + "_spawn_egg");
-        const eggName = this.tags.eggName || (this.tags.name + " Spawn Egg");
+        const eggId = this.tags.id + "_spawn_egg";
+        const eggName = this.tags.name + " Spawn Egg";
+
+        // constructor handler for the spawn egg item
+        const constructorHandler = getHandlerCode("ItemConstructor", this.tags.Constructor, []);
 
         return `(function CustomMobDatablock() {
     function waitForRenderManager() {
@@ -222,7 +211,6 @@ PRIMITIVES["mob"] = {
             ` : ''}
         };
 
-        // vanilla-like sounds for chosen model
         CustomEntity.prototype.$getLivingSound = function () {
             return ModAPI.util.str("${sounds.living}");
         };
@@ -269,17 +257,17 @@ PRIMITIVES["mob"] = {
             return mobTextures;
         };
 
-        // ==== ENTITY REGISTRATION ====
+        // ==== ENTITY REGISTRATION (no natural spawning) ====
         var ID = ModAPI.keygen.entity("${this.tags.id}");
         ModAPI.reflect
             .getClassById("net.minecraft.entity.EntityList")
             .staticMethods.addMapping0.method(
                 ModAPI.util.asClass(CustomEntity),
                 { $createEntity: function (w) { return new CustomEntity(w); } },
-                ModAPI.util.str("${this.tags.id}"),
+                ModAPI.util.str("${this.tags.name}"),
                 ID,
-                0, // egg colors unused now
-                0
+                0xFFFFFF,
+                0x000000
             );
 
         // localization key
@@ -295,7 +283,7 @@ PRIMITIVES["mob"] = {
 
     // ==== RESOURCES & RENDER MAP ====
     ModAPI.addEventListener("lib:asyncsink", async () => {
-        ${hasTexture ? `
+        ${hasMobTexture ? `
         try {
             AsyncSink.setFile(
                 "resourcepacks/AsyncSinkLib/assets/minecraft/textures/entity/${this.tags.id}.png",
@@ -326,7 +314,7 @@ PRIMITIVES["mob"] = {
 })();
 
 (function SpawnEggDatablock() {
-    const $$eggTexture = "${this.tags.eggTexture}";
+    const $$itemTexture = "${this.tags.spawnEggTexture}";
 
     function $$ServersideItem() {
         const $$scoped_efb_globals = {};
@@ -335,15 +323,7 @@ PRIMITIVES["mob"] = {
 
         function $$CustomItem() {
             $$itemSuper(this);
-            // creative tab (same logic as items_creativetab)
-            var tabName = "${this.tags.eggCreativeTab}";
-            if (flags.target === "1_12") {
-                tabName = tabName.replace("tab", "").toUpperCase();
-            }
-            this.$setCreativeTab(
-                ModAPI.reflect.getClassById("net.minecraft.creativetab.CreativeTabs").staticVariables[tabName]
-            );
-            this.$maxStackSize = ${this.tags.eggMaxStackSize};
+            ${constructorHandler.code};
         }
         ModAPI.reflect.prototypeStack($$itemClass, $$CustomItem);
 
@@ -353,7 +333,7 @@ PRIMITIVES["mob"] = {
                     var $$newMob = ModAPI.reflect
                         .getClassById("net.minecraft.entity.EntityList")
                         .staticMethods.createEntityByName.method(
-                            ModAPI.util.str("${this.tags.id}"), $$world
+                            ModAPI.util.str("${this.tags.name}"), $$world
                         );
                     if ($$newMob) {
                         var $$pw = ModAPI.util.wrap($$player);
@@ -374,11 +354,7 @@ PRIMITIVES["mob"] = {
             var $$custom_item = (new $$CustomItem()).$setUnlocalizedName(
                 ModAPI.util.str("${eggId}")
             );
-            $$itemClass.staticMethods.registerItem.method(
-                ModAPI.keygen.item("${eggId}"),
-                ModAPI.util.str("${eggId}"),
-                $$custom_item
-            );
+            $$itemClass.staticMethods.registerItem.method(ModAPI.keygen.item("${eggId}"), ModAPI.util.str("${eggId}"), $$custom_item);
             ModAPI.items["${eggId}"] = $$custom_item;
             return $$custom_item;
         }
@@ -397,22 +373,22 @@ PRIMITIVES["mob"] = {
             $$renderItem.registerItem($$custom_item, ModAPI.util.str("${eggId}"));
         });
         AsyncSink.L10N.set("item.${eggId}.name", "${eggName}");
-
-        AsyncSink.setFile(
-            "resourcepacks/AsyncSinkLib/assets/minecraft/models/item/${eggId}.json",
-            JSON.stringify({
+        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/models/item/${eggId}.json", JSON.stringify(
+            {
                 "parent": "builtin/generated",
                 "textures": {
                     "layer0": "items/${eggId}"
+                },
+                "display": {
+                    "thirdperson": { "rotation": [-90, 0, 0], "translation": [0, 1, -3], "scale": [0.55, 0.55, 0.55] },
+                    "firstperson": { "rotation": [0, -135, 25], "translation": [0, 4, 2], "scale": [1.7, 1.7, 1.7] }
                 }
-            })
-        );
-
+            }
+        ));
         ${hasEggTexture ? `
-        AsyncSink.setFile(
-            "resourcepacks/AsyncSinkLib/assets/minecraft/textures/items/${eggId}.png",
-            await (await fetch($$eggTexture)).arrayBuffer()
-        );
+        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/items/${eggId}.png", await (await fetch(
+            $$itemTexture
+        )).arrayBuffer());
         ` : ""}
     });
 })();`;
