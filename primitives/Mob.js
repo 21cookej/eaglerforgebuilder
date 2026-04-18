@@ -17,7 +17,7 @@ PRIMITIVES["mob"] = {
         maxHealth: 10,
         movementSpeed: 0.25,
         swimSpeed: 1.4,
-        glideSpeed: 1.0,          // 1.0 = normal fall, <1 slower, >1 faster
+        glideSpeed: 1.0,          // 1.0 = vanilla, <1 slower fall, >1 faster fall
 
         // riding
         canBeRidden: false,
@@ -42,28 +42,28 @@ PRIMITIVES["mob"] = {
         breedingItem: "wheat",
         dropItem: "leather",
 
-        // sound keys (can be overridden, but default to vanilla per model)
+        // sounds (defaulted per model if left empty)
         livingSound: "",
         hurtSound: "",
         deathSound: "",
         stepSound: "",
         stepVolume: 0.15,
 
-        // audio files (base64) - optional overrides
+        // audio overrides (optional)
         idleAudioFile: VALUE_ENUMS.FILE,
         hurtAudioFile: VALUE_ENUMS.FILE,
         deathAudioFile: VALUE_ENUMS.FILE,
         stepAudioFile: VALUE_ENUMS.FILE,
 
-        // spawn item texture (base64 IMG) - behaves like a normal item
-        spawnItemTexture: VALUE_ENUMS.IMG
+        // vanilla spawn egg colors
+        eggBaseColor: 0xC1C1C1,   // default: skeleton base
+        eggSpotColor: 0x494949    // default: skeleton spots
     },
     getDependencies: function () {
         return [];
     },
     asJavaScript: function () {
         const hasTexture = this.tags.texture && typeof this.tags.texture === "string" && this.tags.texture.startsWith("data:");
-        const hasSpawnItemTexture = this.tags.spawnItemTexture && typeof this.tags.spawnItemTexture === "string" && this.tags.spawnItemTexture.startsWith("data:");
         const hasIdleAudio = this.tags.idleAudioFile && typeof this.tags.idleAudioFile === "string" && this.tags.idleAudioFile.startsWith("data:");
         const hasHurtAudio = this.tags.hurtAudioFile && typeof this.tags.hurtAudioFile === "string" && this.tags.hurtAudioFile.startsWith("data:");
         const hasDeathAudio = this.tags.deathAudioFile && typeof this.tags.deathAudioFile === "string" && this.tags.deathAudioFile.startsWith("data:");
@@ -81,7 +81,6 @@ PRIMITIVES["mob"] = {
             "CREEPER": "net.minecraft.client.model.ModelCreeper"
         };
 
-        // vanilla-like presets per model
         const modelPresets = {
             "CHICKEN": {
                 livingSound: "mob.chicken.say",
@@ -165,8 +164,8 @@ PRIMITIVES["mob"] = {
         const breedingItemId = this.tags.breedingItem || preset.breedingItem || "wheat";
         const heldItemId = preset.heldItem || null;
 
-        const eggId = this.tags.id + "_spawn_item";
-        const eggName = this.tags.name + " Spawn Item";
+        const eggBaseColor = this.tags.eggBaseColor >>> 0;
+        const eggSpotColor = this.tags.eggSpotColor >>> 0;
 
         return `(function CustomMobDatablock() {
     function waitForRenderManager() {
@@ -183,7 +182,6 @@ PRIMITIVES["mob"] = {
     }
 
     function registerEntity() {
-        // same workaround as Duck mod
         if (ModAPI.hooks && ModAPI.hooks.methods) {
             ModAPI.hooks.methods.jl_String_format = ModAPI.hooks.methods.nlev_HString_format;
         }
@@ -202,7 +200,6 @@ PRIMITIVES["mob"] = {
             .getClassByName("SharedMonsterAttributes")
             .staticVariables;
 
-        // ==== ENTITY CLASS ====
         var entityClass = ModAPI.reflect.getClassById("net.minecraft.entity.passive.EntityAnimal");
         var entitySuper = ModAPI.reflect.getSuper(entityClass, (x) => x.length === 2);
 
@@ -224,7 +221,9 @@ PRIMITIVES["mob"] = {
             ${heldItemId ? `
             try {
                 var ItemStack = ModAPI.reflect.getClassById("net.minecraft.item.ItemStack");
-                var held = new ItemStack((ModAPI.items["${heldItemId}"] || ModAPI.items.stick).getRef(), 1, 0);
+                var Items = ModAPI.reflect.getClassById("net.minecraft.init.Items").staticVariables;
+                var heldItemRef = (ModAPI.items["${heldItemId}"] || Items.bow);
+                var held = new ItemStack(heldItemRef.getRef ? heldItemRef.getRef() : heldItemRef, 1, 0);
                 this.wrapped.setCurrentItemOrArmor(0, held);
             } catch(e) {
                 console.warn("Failed to set held item for ${this.tags.id}:", e);
@@ -252,7 +251,6 @@ PRIMITIVES["mob"] = {
             this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
             originalLivingUpdate.apply(this, []);
 
-            // swimming
             ${this.tags.canSwim ? `
             if (this.wrapped.isInWater()) {
                 this.wrapped.motionY *= 0.5;
@@ -262,15 +260,17 @@ PRIMITIVES["mob"] = {
             }
             ` : ''}
 
-            // glide control
+            // glide: only when falling in air
             if (!this.wrapped.onGround && !this.wrapped.isInWater() && this.wrapped.motionY < 0) {
                 this.wrapped.motionY *= ${this.tags.glideSpeed};
             }
 
-            // spider climbing
+            // spider climbing (only spiders)
             ${this.tags.modelType === "SPIDER" ? `
             if (this.wrapped.isCollidedHorizontally) {
-                this.wrapped.motionY = ${this.tags.spiderClimbSpeed};
+                if (this.wrapped.motionY < ${this.tags.spiderClimbSpeed}) {
+                    this.wrapped.motionY = ${this.tags.spiderClimbSpeed};
+                }
             }
             ` : ''}
         };
@@ -289,9 +289,10 @@ PRIMITIVES["mob"] = {
             return false;
         };
 
-        // middle-click pick result -> custom spawn item
-        CustomEntity.prototype.$getPickedResult = function (hit) {
-            return (ModAPI.items["${eggId}"] || ModAPI.items.spawn_egg)?.getRef() || null;
+        // breeding
+        CustomEntity.prototype.$isBreedingItem = function (itemstack) {
+            var breedItem = (ModAPI.items["${breedingItemId}"] || ModAPI.items.wheat).getRef();
+            return itemstack !== null && itemstack.$getItem() === breedItem;
         };
 
         CustomEntity.prototype.$getLivingSound = function () {
@@ -314,12 +315,22 @@ PRIMITIVES["mob"] = {
             this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
             return new CustomEntity(this.wrapped.worldObj ? this.wrapped.worldObj.getRef() : null);
         };
-        CustomEntity.prototype.$isBreedingItem = function (itemstack) {
-            var breedItem = (ModAPI.items["${breedingItemId}"] || ModAPI.items.wheat).getRef();
-            return itemstack !== null && itemstack.$getItem() === breedItem;
+
+        // middle-click: vanilla spawn egg with correct colors
+        var ID = ModAPI.keygen.entity("${this.tags.id}");
+        CustomEntity.prototype.$getPickedResult = function (hit) {
+            try {
+                var ItemStack = ModAPI.reflect.getClassById("net.minecraft.item.ItemStack");
+                var Items = ModAPI.reflect.getClassById("net.minecraft.init.Items").staticVariables;
+                var spawnEgg = Items.spawn_egg;
+                return new ItemStack(spawnEgg, 1, ID);
+            } catch(e) {
+                console.warn("getPickedResult failed for ${this.tags.id}:", e);
+                return null;
+            }
         };
 
-        // ==== MODEL ====
+        // MODEL
         var modelClass = ModAPI.reflect.getClassById("${modelClassId}");
         var modelSuper = ModAPI.reflect.getSuper(modelClass);
         var CustomModel = function CustomModel() {
@@ -327,7 +338,7 @@ PRIMITIVES["mob"] = {
         };
         ModAPI.reflect.prototypeStack(modelClass, CustomModel);
 
-        // ==== RENDERER ====
+        // RENDERER
         var renderClass = ModAPI.reflect.getClassById("net.minecraft.client.renderer.entity.RenderLiving");
         var renderSuper = ModAPI.reflect.getSuper(renderClass, (x) => x.length === 4);
         const mobTextures = ResourceLocation(ModAPI.util.str("textures/entity/${this.tags.id}.png"));
@@ -339,7 +350,6 @@ PRIMITIVES["mob"] = {
         CustomRender.prototype.$getEntityTexture = function () {
             return mobTextures;
         };
-        // chicken wing / falling animation tweak (duck-style)
         CustomRender.prototype.$handleRotationFloat = function (entity, partialTicks) {
             entity = ModAPI.util.wrap(entity);
             if ((!entity.onGround) && (!entity.isInWater())) {
@@ -349,8 +359,7 @@ PRIMITIVES["mob"] = {
             }
         };
 
-        // ==== ENTITY REGISTRATION ====
-        var ID = ModAPI.keygen.entity("${this.tags.id}");
+        // ENTITY REGISTRATION (vanilla spawn egg colors)
         ModAPI.reflect
             .getClassById("net.minecraft.entity.EntityList")
             .staticMethods.addMapping0.method(
@@ -358,11 +367,10 @@ PRIMITIVES["mob"] = {
                 { $createEntity: function (w) { return new CustomEntity(w); } },
                 ModAPI.util.str("${this.tags.name}"),
                 ID,
-                0x000000,
-                0xFFFFFF
+                ${eggBaseColor},
+                ${eggSpotColor}
             );
 
-        // spawn placement
         const SpawnPlacementType = ModAPI.reflect
             .getClassById("net.minecraft.entity.EntityLiving$SpawnPlacementType")
             .staticVariables;
@@ -373,9 +381,6 @@ PRIMITIVES["mob"] = {
         );
         ENTITY_PLACEMENTS.put(ModAPI.util.asClass(CustomEntity), SpawnPlacementType.ON_GROUND);
 
-        // no biome spawning here (purely spawn-item based)
-
-        // localization key
         ModAPI.addEventListener("lib:asyncsink", () => {
             AsyncSink.L10N.set("entity.${this.tags.id}.name", "${this.tags.name}");
         });
@@ -386,7 +391,6 @@ PRIMITIVES["mob"] = {
     ModAPI.dedicatedServer.appendCode(registerEntity);
     var data = registerEntity();
 
-    // ==== RESOURCES & RENDER MAP ====
     ModAPI.addEventListener("lib:asyncsink", async () => {
         ${hasTexture ? `
         try {
@@ -463,95 +467,6 @@ PRIMITIVES["mob"] = {
         } catch(e) {
             console.warn("Failed to register renderer for ${this.tags.id}:", e);
         }
-    });
-})();
-(function SpawnItemDatablock() {
-    const $$itemTexture = "${this.tags.spawnItemTexture}";
-
-    function $$ServersideItem() {
-        const $$scoped_efb_globals = {};
-        var $$itemClass = ModAPI.reflect.getClassById("net.minecraft.item.Item");
-        var $$itemSuper = ModAPI.reflect.getSuper($$itemClass, (x) => x.length === 1);
-
-        function $$CustomItem() {
-            $$itemSuper(this);
-        }
-        ModAPI.reflect.prototypeStack($$itemClass, $$CustomItem);
-
-        // right click: spawn mob at clicked block
-        $$CustomItem.prototype.$onItemRightClick = function ($$itemstack, $$world, $$player) {
-            if (!$$world.$isRemote) {
-                try {
-                    var $$newMob = ModAPI.reflect
-                        .getClassById("net.minecraft.entity.EntityList")
-                        .staticMethods.createEntityByName.method(
-                            ModAPI.util.str("${this.tags.id}"), $$world
-                        );
-                    if ($$newMob) {
-                        var $$pw = ModAPI.util.wrap($$player);
-                        var hit = $$pw.rayTrace(5.0, 1.0);
-                        if (hit && hit.$typeOfHit === "BLOCK") {
-                            var pos = hit.$getBlockPos();
-                            ModAPI.util.wrap($$newMob).setPosition(
-                                pos.$getX() + 0.5,
-                                pos.$getY() + 1,
-                                pos.$getZ() + 0.5
-                            );
-                        } else {
-                            ModAPI.util.wrap($$newMob).setPosition($$pw.posX, $$pw.posY, $$pw.posZ);
-                        }
-                        $$world.$spawnEntityInWorld($$newMob);
-                        if (!$$pw.capabilities.$isCreativeMode) {
-                            $$itemstack.$stackSize -= 1;
-                        }
-                    }
-                } catch(e) {
-                    console.warn("Spawn item use failed for ${this.tags.id}:", e);
-                }
-            }
-            return $$itemstack;
-        };
-
-        function $$internal_reg() {
-            var $$custom_item = (new $$CustomItem()).$setUnlocalizedName(
-                ModAPI.util.str("${eggId}")
-            );
-            $$itemClass.staticMethods.registerItem.method(ModAPI.keygen.item("${eggId}"), ModAPI.util.str("${eggId}"), $$custom_item);
-            ModAPI.items["${eggId}"] = $$custom_item;
-            return $$custom_item;
-        }
-        if (ModAPI.items) {
-            return $$internal_reg();
-        } else {
-            ModAPI.addEventListener("bootstrap", $$internal_reg);
-        }
-    }
-
-    ModAPI.dedicatedServer.appendCode($$ServersideItem);
-    var $$custom_item = $$ServersideItem();
-
-    ModAPI.addEventListener("lib:asyncsink", async () => {
-        ModAPI.addEventListener("lib:asyncsink:registeritems", ($$renderItem) => {
-            $$renderItem.registerItem($$custom_item, ModAPI.util.str("${eggId}"));
-        });
-        AsyncSink.L10N.set("item.${eggId}.name", "${eggName}");
-        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/models/item/${eggId}.json", JSON.stringify(
-            {
-                "parent": "builtin/generated",
-                "textures": {
-                    "layer0": "items/${eggId}"
-                },
-                "display": {
-                    "thirdperson": { "rotation": [-90, 0, 0], "translation": [0, 1, -3], "scale": [0.55, 0.55, 0.55] },
-                    "firstperson": { "rotation": [0, -135, 25], "translation": [0, 4, 2], "scale": [1.7, 1.7, 1.7] }
-                }
-            }
-        ));
-        ${hasSpawnItemTexture ? `
-        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/items/${eggId}.png", await (await fetch(
-            $$itemTexture
-        )).arrayBuffer());
-        ` : ""}
     });
 })();`;
     }
