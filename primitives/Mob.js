@@ -22,6 +22,12 @@ PRIMITIVES["mob"] = {
         swimSpeed: 1.4,
         glideSpeed: 1.0,          // 1.0 = vanilla fall, <1 slower, >1 faster
 
+        // advanced attributes
+        attackDamage: 2.0,
+        armor: 0.0,
+        knockbackResistance: 0.0,
+        followRange: 16.0,
+
         // AI toggles
         canSwim: true,
         canPanic: true,
@@ -224,8 +230,13 @@ PRIMITIVES["mob"] = {
         const cowMilkResultItem   = this.tags.cowMilkResultItem || "milk_bucket";
         const cowMilkCooldown     = this.tags.cowMilkCooldown | 0;
 
-        const creeperFuseTime     = this.tags.creeperFuseTime | 0;
+        const creeperFuseTime       = this.tags.creeperFuseTime | 0;
         const creeperExplosionPower = this.tags.creeperExplosionPower | 0;
+
+        const attackDamage        = this.tags.attackDamage;
+        const armor               = this.tags.armor;
+        const knockbackResistance = this.tags.knockbackResistance;
+        const followRange         = this.tags.followRange;
 
         return `(function CustomMobDatablock() {
     function waitForRenderManager() {
@@ -264,8 +275,8 @@ PRIMITIVES["mob"] = {
             entitySuper(this, worldIn);
             this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
 
-            // default size per model (builder should also sync these when modelType changes)
-            this.wrapped.setSize(${(defaultSizes[this.tags.modelType] || {w:this.tags.width,h:this.tags.height}).w}, ${(defaultSizes[this.tags.modelType] || {w:this.tags.width,h:this.tags.height}).h});
+            var sz = ${JSON.stringify(defaultSizes)}["${this.tags.modelType}"] || { w: ${this.tags.width}, h: ${this.tags.height} };
+            this.wrapped.setSize(sz.w, sz.h);
 
             var taskId = 0;
             ${this.tags.canSwim ? 'this.wrapped.tasks.addTask(taskId++, AITask("EntityAISwimming", 1)(this));' : ''}
@@ -277,7 +288,6 @@ PRIMITIVES["mob"] = {
             ${this.tags.canWatchPlayer ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIWatchClosest", 3)(this, ModAPI.util.asClass(EntityPlayer.class), ${this.tags.watchDistance}));` : ''}
             this.wrapped.tasks.addTask(taskId++, AITask("EntityAILookIdle", 1)(this));
 
-            // hostile attack AI
             ${!isPassive ? `
             var EntityAINearestAttackableTarget = AITask("EntityAINearestAttackableTarget", 3);
             var EntityAIAttackOnCollide = AITask("EntityAIAttackOnCollide", 3);
@@ -285,7 +295,6 @@ PRIMITIVES["mob"] = {
             this.wrapped.tasks.addTask(2, EntityAIAttackOnCollide(this, ModAPI.util.asClass(EntityPlayer.class), 1.0, false));
             ` : ''}
 
-            // skeleton held item
             ${this.tags.modelType === "SKELETON" ? `
             try {
                 var ItemStack = ModAPI.reflect.getClassById("net.minecraft.item.ItemStack");
@@ -311,6 +320,18 @@ PRIMITIVES["mob"] = {
             originalApplyEntityAttributes.apply(this, []);
             this.wrapped.getEntityAttribute(SharedMonsterAttributes.maxHealth).setBaseValue(${this.tags.maxHealth});
             this.wrapped.getEntityAttribute(SharedMonsterAttributes.movementSpeed).setBaseValue(${this.tags.movementSpeed});
+            if (SharedMonsterAttributes.attackDamage) {
+                this.wrapped.getEntityAttribute(SharedMonsterAttributes.attackDamage).setBaseValue(${attackDamage});
+            }
+            if (SharedMonsterAttributes.armor) {
+                this.wrapped.getEntityAttribute(SharedMonsterAttributes.armor).setBaseValue(${armor});
+            }
+            if (SharedMonsterAttributes.knockbackResistance) {
+                this.wrapped.getEntityAttribute(SharedMonsterAttributes.knockbackResistance).setBaseValue(${knockbackResistance});
+            }
+            if (SharedMonsterAttributes.followRange) {
+                this.wrapped.getEntityAttribute(SharedMonsterAttributes.followRange).setBaseValue(${followRange});
+            }
         };
 
         const originalLivingUpdate = CustomEntity.prototype.$onLivingUpdate;
@@ -327,12 +348,10 @@ PRIMITIVES["mob"] = {
             }
             ` : ''}
 
-            // glide
             if (!this.wrapped.onGround && !this.wrapped.isInWater() && this.wrapped.motionY < 0) {
                 this.wrapped.motionY *= ${this.tags.glideSpeed};
             }
 
-            // spider climb
             ${this.tags.modelType === "SPIDER" ? `
             if (this.wrapped.isCollidedHorizontally) {
                 if (this.wrapped.motionY < ${this.tags.spiderClimbSpeed}) {
@@ -340,15 +359,36 @@ PRIMITIVES["mob"] = {
                 }
             }
             ` : ''}
+
+            ${this.tags.modelType === "CREEPER" ? `
+            if (!this.wrapped.worldObj.$isRemote) {
+                var nearest = this.wrapped.worldObj.$getClosestPlayerToEntity(this.wrapped, 3.0);
+                if (nearest) {
+                    if (!this._fuse) this._fuse = 0;
+                    this._fuse++;
+                    if (this._fuse >= ${creeperFuseTime}) {
+                        this.wrapped.worldObj.$createExplosion(
+                            this.wrapped,
+                            this.wrapped.posX,
+                            this.wrapped.posY,
+                            this.wrapped.posZ,
+                            ${creeperExplosionPower},
+                            true
+                        );
+                        this.wrapped.$setDead();
+                    }
+                } else {
+                    this._fuse = 0;
+                }
+            }
+            ` : ''}
         };
 
-        // interaction: cow milking & sheep shearing
         CustomEntity.prototype.$interact = function (player) {
             this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
             var pw = ModAPI.util.wrap(player);
             var held = pw.getHeldItem();
 
-            // cow milking
             ${this.tags.modelType === "COW" ? `
             if (held && held.$getItem() === (ModAPI.items["${cowMilkingItem}"] || ModAPI.items.bucket).getRef()) {
                 try {
@@ -363,7 +403,6 @@ PRIMITIVES["mob"] = {
             }
             ` : ''}
 
-            // sheep shearing
             ${this.tags.modelType === "SHEEP" && sheepCanBeSheared ? `
             if (held && held.$getItem() === (ModAPI.items.shears || ModAPI.items.shears).getRef()) {
                 try {
@@ -384,7 +423,6 @@ PRIMITIVES["mob"] = {
             return false;
         };
 
-        // breeding
         CustomEntity.prototype.$isBreedingItem = function (itemstack) {
             if (!${!!this.tags.canBreed} || !${!!breedingItemId}) return false;
             var breedItem = ModAPI.items["${breedingItemId}"]?.getRef();
@@ -413,29 +451,6 @@ PRIMITIVES["mob"] = {
             return new CustomEntity(this.wrapped.worldObj ? this.wrapped.worldObj.getRef() : null);
         };
 
-        // creeper behaviour (simple fuse + explosion)
-        ${this.tags.modelType === "CREEPER" ? `
-        CustomEntity.prototype.$onUpdate = function () {
-            this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
-            this.wrapped.onUpdate();
-            if (!this.wrapped.worldObj.$isRemote) {
-                var EntityPlayer = ModAPI.reflect.getClassByName("EntityPlayer");
-                var nearest = this.wrapped.worldObj.$getClosestPlayerToEntity(this.wrapped, 3.0);
-                if (nearest) {
-                    if (!this._fuse) this._fuse = 0;
-                    this._fuse++;
-                    if (this._fuse >= ${creeperFuseTime}) {
-                        this.wrapped.worldObj.$createExplosion(this.wrapped, this.wrapped.posX, this.wrapped.posY, this.wrapped.posZ, ${creeperExplosionPower}, true);
-                        this.wrapped.$setDead();
-                    }
-                } else {
-                    this._fuse = 0;
-                }
-            }
-        };
-        ` : ''}
-
-        // middle-click: vanilla spawn egg
         var ID = ModAPI.keygen.entity("${this.tags.id}");
         CustomEntity.prototype.$getPickedResult = function (hit) {
             try {
@@ -449,7 +464,6 @@ PRIMITIVES["mob"] = {
             }
         };
 
-        // MODEL
         var modelClass = ModAPI.reflect.getClassById("${modelClassId}");
         var modelSuper = ModAPI.reflect.getSuper(modelClass);
         var CustomModel = function CustomModel() {
@@ -457,7 +471,6 @@ PRIMITIVES["mob"] = {
         };
         ModAPI.reflect.prototypeStack(modelClass, CustomModel);
 
-        // RENDERER
         var renderClass = ModAPI.reflect.getClassById("net.minecraft.client.renderer.entity.RenderLiving");
         var renderSuper = ModAPI.reflect.getSuper(renderClass, (x) => x.length === 4);
         const mobTextures = ResourceLocation(ModAPI.util.str("textures/entity/${this.tags.id}.png"));
@@ -474,7 +487,6 @@ PRIMITIVES["mob"] = {
             if ((!entity.onGround) && (!entity.isInWater())) return 2;
             return 0;
         };
-        // render held items (skeleton etc.)
         CustomRender.prototype.$renderEquippedItems = function(entity, partialTicks) {
             try {
                 var wrap = ModAPI.util.wrap(entity);
@@ -485,7 +497,6 @@ PRIMITIVES["mob"] = {
             } catch(e) {}
         };
 
-        // ENTITY REGISTRATION
         ModAPI.reflect
             .getClassById("net.minecraft.entity.EntityList")
             .staticMethods.addMapping0.method(
