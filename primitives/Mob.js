@@ -7,8 +7,8 @@ PRIMITIVES["mob"] = {
         name: "Custom Mob",
 
         // visuals
-        texture: VALUE_ENUMS.IMG, // mob texture (entity)
-        modelType: ["CHICKEN", "PIG", "COW", "SHEEP", "WOLF", "ZOMBIE", "SKELETON", "SPIDER"],
+        texture: VALUE_ENUMS.IMG,
+        modelType: ["CHICKEN", "PIG", "COW", "SHEEP", "WOLF", "ZOMBIE", "SKELETON", "SPIDER", "CREEPER"],
         width: 0.4,
         height: 0.7,
         shadowSize: 0.3,
@@ -17,6 +17,13 @@ PRIMITIVES["mob"] = {
         maxHealth: 10,
         movementSpeed: 0.25,
         swimSpeed: 1.4,
+        glideSpeed: 1.0,          // 1.0 = normal fall, <1 slower, >1 faster
+
+        // riding
+        canBeRidden: false,
+
+        // spider climbing
+        spiderClimbSpeed: 0.3,    // only used when modelType === "SPIDER"
 
         // AI toggles
         canSwim: true,
@@ -35,18 +42,32 @@ PRIMITIVES["mob"] = {
         breedingItem: "wheat",
         dropItem: "leather",
 
-        // custom spawn egg texture (base64 IMG, like a normal item)
-        spawnEggTexture: VALUE_ENUMS.IMG,
+        // sound keys (can be overridden, but default to vanilla per model)
+        livingSound: "",
+        hurtSound: "",
+        deathSound: "",
+        stepSound: "",
+        stepVolume: 0.15,
 
-        // item-constructor handler for the spawn egg
-        Constructor: VALUE_ENUMS.ABSTRACT_HANDLER + "ItemConstructor"
+        // audio files (base64) - optional overrides
+        idleAudioFile: VALUE_ENUMS.FILE,
+        hurtAudioFile: VALUE_ENUMS.FILE,
+        deathAudioFile: VALUE_ENUMS.FILE,
+        stepAudioFile: VALUE_ENUMS.FILE,
+
+        // spawn item texture (base64 IMG) - behaves like a normal item
+        spawnItemTexture: VALUE_ENUMS.IMG
     },
     getDependencies: function () {
         return [];
     },
     asJavaScript: function () {
-        const hasMobTexture = this.tags.texture && typeof this.tags.texture === "string" && this.tags.texture.startsWith("data:");
-        const hasEggTexture = this.tags.spawnEggTexture && typeof this.tags.spawnEggTexture === "string" && this.tags.spawnEggTexture.startsWith("data:");
+        const hasTexture = this.tags.texture && typeof this.tags.texture === "string" && this.tags.texture.startsWith("data:");
+        const hasSpawnItemTexture = this.tags.spawnItemTexture && typeof this.tags.spawnItemTexture === "string" && this.tags.spawnItemTexture.startsWith("data:");
+        const hasIdleAudio = this.tags.idleAudioFile && typeof this.tags.idleAudioFile === "string" && this.tags.idleAudioFile.startsWith("data:");
+        const hasHurtAudio = this.tags.hurtAudioFile && typeof this.tags.hurtAudioFile === "string" && this.tags.hurtAudioFile.startsWith("data:");
+        const hasDeathAudio = this.tags.deathAudioFile && typeof this.tags.deathAudioFile === "string" && this.tags.deathAudioFile.startsWith("data:");
+        const hasStepAudio = this.tags.stepAudioFile && typeof this.tags.stepAudioFile === "string" && this.tags.stepAudioFile.startsWith("data:");
 
         const modelMapping = {
             "CHICKEN": "net.minecraft.client.model.ModelChicken",
@@ -56,77 +77,96 @@ PRIMITIVES["mob"] = {
             "WOLF": "net.minecraft.client.model.ModelWolf",
             "ZOMBIE": "net.minecraft.client.model.ModelZombie",
             "SKELETON": "net.minecraft.client.model.ModelSkeleton",
-            "SPIDER": "net.minecraft.client.model.ModelSpider"
+            "SPIDER": "net.minecraft.client.model.ModelSpider",
+            "CREEPER": "net.minecraft.client.model.ModelCreeper"
         };
 
-        // vanilla sound keys per model type
-        const soundMapping = {
+        // vanilla-like presets per model
+        const modelPresets = {
             "CHICKEN": {
-                living: "mob.chicken.say",
-                hurt: "mob.chicken.hurt",
-                death: "mob.chicken.hurt",
-                step: "mob.chicken.step",
-                stepVolume: 0.15
+                livingSound: "mob.chicken.say",
+                hurtSound: "mob.chicken.hurt",
+                deathSound: "mob.chicken.hurt",
+                stepSound: "mob.chicken.step",
+                dropItem: "chicken",
+                breedingItem: "seeds"
             },
             "PIG": {
-                living: "mob.pig.say",
-                hurt: "mob.pig.say",
-                death: "mob.pig.death",
-                step: "mob.pig.step",
-                stepVolume: 0.15
+                livingSound: "mob.pig.say",
+                hurtSound: "mob.pig.say",
+                deathSound: "mob.pig.death",
+                stepSound: "mob.pig.step",
+                dropItem: "porkchop",
+                breedingItem: "carrot"
             },
             "COW": {
-                living: "mob.cow.say",
-                hurt: "mob.cow.hurt",
-                death: "mob.cow.hurt",
-                step: "mob.cow.step",
-                stepVolume: 0.15
+                livingSound: "mob.cow.say",
+                hurtSound: "mob.cow.hurt",
+                deathSound: "mob.cow.hurt",
+                stepSound: "mob.cow.step",
+                dropItem: "beef",
+                breedingItem: "wheat"
             },
             "SHEEP": {
-                living: "mob.sheep.say",
-                hurt: "mob.sheep.say",
-                death: "mob.sheep.say",
-                step: "mob.sheep.step",
-                stepVolume: 0.15
+                livingSound: "mob.sheep.say",
+                hurtSound: "mob.sheep.say",
+                deathSound: "mob.sheep.say",
+                stepSound: "mob.sheep.step",
+                dropItem: "mutton",
+                breedingItem: "wheat"
             },
             "WOLF": {
-                living: "mob.wolf.bark",
-                hurt: "mob.wolf.hurt",
-                death: "mob.wolf.death",
-                step: "mob.wolf.step",
-                stepVolume: 0.15
+                livingSound: "mob.wolf.bark",
+                hurtSound: "mob.wolf.hurt",
+                deathSound: "mob.wolf.death",
+                stepSound: "mob.wolf.step",
+                dropItem: "bone",
+                breedingItem: "beef"
             },
             "ZOMBIE": {
-                living: "mob.zombie.say",
-                hurt: "mob.zombie.hurt",
-                death: "mob.zombie.death",
-                step: "mob.zombie.step",
-                stepVolume: 0.15
+                livingSound: "mob.zombie.say",
+                hurtSound: "mob.zombie.hurt",
+                deathSound: "mob.zombie.death",
+                stepSound: "mob.zombie.step",
+                dropItem: "rotten_flesh"
             },
             "SKELETON": {
-                living: "mob.skeleton.say",
-                hurt: "mob.skeleton.hurt",
-                death: "mob.skeleton.death",
-                step: "mob.skeleton.step",
-                stepVolume: 0.15
+                livingSound: "mob.skeleton.say",
+                hurtSound: "mob.skeleton.hurt",
+                deathSound: "mob.skeleton.death",
+                stepSound: "mob.skeleton.step",
+                dropItem: "bone",
+                heldItem: "bow"
             },
             "SPIDER": {
-                living: "mob.spider.say",
-                hurt: "mob.spider.say",
-                death: "mob.spider.death",
-                step: "mob.spider.step",
-                stepVolume: 0.15
+                livingSound: "mob.spider.say",
+                hurtSound: "mob.spider.say",
+                deathSound: "mob.spider.death",
+                stepSound: "mob.spider.step",
+                dropItem: "string"
+            },
+            "CREEPER": {
+                livingSound: "mob.creeper.say",
+                hurtSound: "mob.creeper.say",
+                deathSound: "mob.creeper.death",
+                stepSound: "mob.creeper.step",
+                dropItem: "gunpowder"
             }
         };
 
+        const preset = modelPresets[this.tags.modelType] || {};
         const modelClassId = modelMapping[this.tags.modelType] || "net.minecraft.client.model.ModelChicken";
-        const sounds = soundMapping[this.tags.modelType] || soundMapping["CHICKEN"];
 
-        const eggId = this.tags.id + "_spawn_egg";
-        const eggName = this.tags.name + " Spawn Egg";
+        const livingSound = this.tags.livingSound || preset.livingSound || "mob.custom.idle";
+        const hurtSound = this.tags.hurtSound || preset.hurtSound || "mob.custom.hurt";
+        const deathSound = this.tags.deathSound || preset.deathSound || "mob.custom.death";
+        const stepSound = this.tags.stepSound || preset.stepSound || "mob.custom.step";
+        const dropItemId = this.tags.dropItem || preset.dropItem || "leather";
+        const breedingItemId = this.tags.breedingItem || preset.breedingItem || "wheat";
+        const heldItemId = preset.heldItem || null;
 
-        // constructor handler for the spawn egg item
-        const constructorHandler = getHandlerCode("ItemConstructor", this.tags.Constructor, []);
+        const eggId = this.tags.id + "_spawn_item";
+        const eggName = this.tags.name + " Spawn Item";
 
         return `(function CustomMobDatablock() {
     function waitForRenderManager() {
@@ -175,11 +215,21 @@ PRIMITIVES["mob"] = {
             ${this.tags.canSwim ? 'this.wrapped.tasks.addTask(taskId++, AITask("EntityAISwimming", 1)(this));' : ''}
             ${this.tags.canPanic ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIPanic", 2)(this, ${this.tags.panicSpeed}));` : ''}
             ${this.tags.canMate ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIMate", 2)(this, ${this.tags.mateSpeed}));` : ''}
-            this.wrapped.tasks.addTask(taskId++, AITask("EntityAITempt", 4)(this, 1.5, (ModAPI.items["${this.tags.breedingItem}"] || ModAPI.items.wheat).getRef(), 0));
+            this.wrapped.tasks.addTask(taskId++, AITask("EntityAITempt", 4)(this, 1.5, (ModAPI.items["${breedingItemId}"] || ModAPI.items.wheat).getRef(), 0));
             ${this.tags.canFollowParent ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIFollowParent", 2)(this, ${this.tags.followParentSpeed}));` : ''}
             ${this.tags.canWander ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIWander", 2)(this, ${this.tags.wanderSpeed}));` : ''}
             ${this.tags.canWatchPlayer ? `this.wrapped.tasks.addTask(taskId++, AITask("EntityAIWatchClosest", 3)(this, ModAPI.util.asClass(EntityPlayer.class), ${this.tags.watchDistance}));` : ''}
             this.wrapped.tasks.addTask(taskId++, AITask("EntityAILookIdle", 1)(this));
+
+            ${heldItemId ? `
+            try {
+                var ItemStack = ModAPI.reflect.getClassById("net.minecraft.item.ItemStack");
+                var held = new ItemStack((ModAPI.items["${heldItemId}"] || ModAPI.items.stick).getRef(), 1, 0);
+                this.wrapped.setCurrentItemOrArmor(0, held);
+            } catch(e) {
+                console.warn("Failed to set held item for ${this.tags.id}:", e);
+            }
+            ` : ''}
         };
 
         ModAPI.reflect.prototypeStack(entityClass, CustomEntity);
@@ -201,6 +251,8 @@ PRIMITIVES["mob"] = {
         CustomEntity.prototype.$onLivingUpdate = function () {
             this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
             originalLivingUpdate.apply(this, []);
+
+            // swimming
             ${this.tags.canSwim ? `
             if (this.wrapped.isInWater()) {
                 this.wrapped.motionY *= 0.5;
@@ -209,30 +261,61 @@ PRIMITIVES["mob"] = {
                 this.wrapped.getEntityAttribute(SharedMonsterAttributes.movementSpeed).setBaseValue(${this.tags.movementSpeed});
             }
             ` : ''}
+
+            // glide control
+            if (!this.wrapped.onGround && !this.wrapped.isInWater() && this.wrapped.motionY < 0) {
+                this.wrapped.motionY *= ${this.tags.glideSpeed};
+            }
+
+            // spider climbing
+            ${this.tags.modelType === "SPIDER" ? `
+            if (this.wrapped.isCollidedHorizontally) {
+                this.wrapped.motionY = ${this.tags.spiderClimbSpeed};
+            }
+            ` : ''}
+        };
+
+        // riding
+        CustomEntity.prototype.$interact = function (player) {
+            ${this.tags.canBeRidden ? `
+            try {
+                var pw = ModAPI.util.wrap(player);
+                pw.mountEntity(this.wrapped);
+                return true;
+            } catch(e) {
+                console.warn("Ride interaction failed for ${this.tags.id}:", e);
+            }
+            ` : ''}
+            return false;
+        };
+
+        // middle-click pick result -> custom spawn item
+        CustomEntity.prototype.$getPickedResult = function (hit) {
+            return (ModAPI.items["${eggId}"] || ModAPI.items.spawn_egg)?.getRef() || null;
         };
 
         CustomEntity.prototype.$getLivingSound = function () {
-            return ModAPI.util.str("${sounds.living}");
+            return ModAPI.util.str("${livingSound}");
         };
         CustomEntity.prototype.$getHurtSound = function () {
-            return ModAPI.util.str("${sounds.hurt}");
+            return ModAPI.util.str("${hurtSound}");
         };
         CustomEntity.prototype.$getDeathSound = function () {
-            return ModAPI.util.str("${sounds.death}");
+            return ModAPI.util.str("${deathSound}");
         };
         CustomEntity.prototype.$playStepSound = function () {
             this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
-            this.wrapped.playSound(ModAPI.util.str("${sounds.step}"), ${sounds.stepVolume}, 1);
+            this.wrapped.playSound(ModAPI.util.str("${stepSound}"), ${this.tags.stepVolume}, 1);
         };
         CustomEntity.prototype.$getDropItem = function () {
-            return (ModAPI.items["${this.tags.dropItem}"] || ModAPI.items.leather).getRef();
+            return (ModAPI.items["${dropItemId}"] || ModAPI.items.leather).getRef();
         };
         CustomEntity.prototype.$createChild = function (otherParent) {
             this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
             return new CustomEntity(this.wrapped.worldObj ? this.wrapped.worldObj.getRef() : null);
         };
         CustomEntity.prototype.$isBreedingItem = function (itemstack) {
-            var breedItem = (ModAPI.items["${this.tags.breedingItem}"] || ModAPI.items.wheat).getRef();
+            var breedItem = (ModAPI.items["${breedingItemId}"] || ModAPI.items.wheat).getRef();
             return itemstack !== null && itemstack.$getItem() === breedItem;
         };
 
@@ -256,8 +339,17 @@ PRIMITIVES["mob"] = {
         CustomRender.prototype.$getEntityTexture = function () {
             return mobTextures;
         };
+        // chicken wing / falling animation tweak (duck-style)
+        CustomRender.prototype.$handleRotationFloat = function (entity, partialTicks) {
+            entity = ModAPI.util.wrap(entity);
+            if ((!entity.onGround) && (!entity.isInWater())) {
+                return 2;
+            } else {
+                return 0;
+            }
+        };
 
-        // ==== ENTITY REGISTRATION (no natural spawning) ====
+        // ==== ENTITY REGISTRATION ====
         var ID = ModAPI.keygen.entity("${this.tags.id}");
         ModAPI.reflect
             .getClassById("net.minecraft.entity.EntityList")
@@ -266,9 +358,22 @@ PRIMITIVES["mob"] = {
                 { $createEntity: function (w) { return new CustomEntity(w); } },
                 ModAPI.util.str("${this.tags.name}"),
                 ID,
-                0xFFFFFF,
-                0x000000
+                0x000000,
+                0xFFFFFF
             );
+
+        // spawn placement
+        const SpawnPlacementType = ModAPI.reflect
+            .getClassById("net.minecraft.entity.EntityLiving$SpawnPlacementType")
+            .staticVariables;
+        const ENTITY_PLACEMENTS = ModAPI.util.wrap(
+            ModAPI.reflect
+                .getClassById("net.minecraft.entity.EntitySpawnPlacementRegistry")
+                .staticVariables.ENTITY_PLACEMENTS
+        );
+        ENTITY_PLACEMENTS.put(ModAPI.util.asClass(CustomEntity), SpawnPlacementType.ON_GROUND);
+
+        // no biome spawning here (purely spawn-item based)
 
         // localization key
         ModAPI.addEventListener("lib:asyncsink", () => {
@@ -283,7 +388,7 @@ PRIMITIVES["mob"] = {
 
     // ==== RESOURCES & RENDER MAP ====
     ModAPI.addEventListener("lib:asyncsink", async () => {
-        ${hasMobTexture ? `
+        ${hasTexture ? `
         try {
             AsyncSink.setFile(
                 "resourcepacks/AsyncSinkLib/assets/minecraft/textures/entity/${this.tags.id}.png",
@@ -296,6 +401,54 @@ PRIMITIVES["mob"] = {
         ` : ""}
 
         await waitForRenderManager();
+
+        ${hasIdleAudio ? `
+        try {
+            AsyncSink.setFile(
+                "resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/idle.ogg",
+                await (await fetch("${this.tags.idleAudioFile}")).arrayBuffer()
+            );
+            AsyncSink.Audio.register("${livingSound}", AsyncSink.Audio.Category.ANIMALS, [
+                { path: "sounds/mob/${this.tags.id}/idle.ogg", pitch: 1, volume: 1, streaming: false }
+            ]);
+        } catch(e) {}
+        ` : ""}
+
+        ${hasHurtAudio ? `
+        try {
+            AsyncSink.setFile(
+                "resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/hurt.ogg",
+                await (await fetch("${this.tags.hurtAudioFile}")).arrayBuffer()
+            );
+            AsyncSink.Audio.register("${hurtSound}", AsyncSink.Audio.Category.ANIMALS, [
+                { path: "sounds/mob/${this.tags.id}/hurt.ogg", pitch: 1, volume: 1, streaming: false }
+            ]);
+        } catch(e) {}
+        ` : ""}
+
+        ${hasDeathAudio ? `
+        try {
+            AsyncSink.setFile(
+                "resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/death.ogg",
+                await (await fetch("${this.tags.deathAudioFile}")).arrayBuffer()
+            );
+            AsyncSink.Audio.register("${deathSound}", AsyncSink.Audio.Category.ANIMALS, [
+                { path: "sounds/mob/${this.tags.id}/death.ogg", pitch: 1, volume: 1, streaming: false }
+            ]);
+        } catch(e) {}
+        ` : ""}
+
+        ${hasStepAudio ? `
+        try {
+            AsyncSink.setFile(
+                "resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/step.ogg",
+                await (await fetch("${this.tags.stepAudioFile}")).arrayBuffer()
+            );
+            AsyncSink.Audio.register("${stepSound}", AsyncSink.Audio.Category.ANIMALS, [
+                { path: "sounds/mob/${this.tags.id}/step.ogg", pitch: 1, volume: 1, streaming: false }
+            ]);
+        } catch(e) {}
+        ` : ""}
 
         try {
             ModAPI.mc.renderManager.entityRenderMap.put(
@@ -312,9 +465,8 @@ PRIMITIVES["mob"] = {
         }
     });
 })();
-
-(function SpawnEggDatablock() {
-    const $$itemTexture = "${this.tags.spawnEggTexture}";
+(function SpawnItemDatablock() {
+    const $$itemTexture = "${this.tags.spawnItemTexture}";
 
     function $$ServersideItem() {
         const $$scoped_efb_globals = {};
@@ -323,28 +475,38 @@ PRIMITIVES["mob"] = {
 
         function $$CustomItem() {
             $$itemSuper(this);
-            ${constructorHandler.code};
         }
         ModAPI.reflect.prototypeStack($$itemClass, $$CustomItem);
 
+        // right click: spawn mob at clicked block
         $$CustomItem.prototype.$onItemRightClick = function ($$itemstack, $$world, $$player) {
             if (!$$world.$isRemote) {
                 try {
                     var $$newMob = ModAPI.reflect
                         .getClassById("net.minecraft.entity.EntityList")
                         .staticMethods.createEntityByName.method(
-                            ModAPI.util.str("${this.tags.name}"), $$world
+                            ModAPI.util.str("${this.tags.id}"), $$world
                         );
                     if ($$newMob) {
                         var $$pw = ModAPI.util.wrap($$player);
-                        ModAPI.util.wrap($$newMob).setPosition($$pw.posX + 1, $$pw.posY, $$pw.posZ);
+                        var hit = $$pw.rayTrace(5.0, 1.0);
+                        if (hit && hit.$typeOfHit === "BLOCK") {
+                            var pos = hit.$getBlockPos();
+                            ModAPI.util.wrap($$newMob).setPosition(
+                                pos.$getX() + 0.5,
+                                pos.$getY() + 1,
+                                pos.$getZ() + 0.5
+                            );
+                        } else {
+                            ModAPI.util.wrap($$newMob).setPosition($$pw.posX, $$pw.posY, $$pw.posZ);
+                        }
                         $$world.$spawnEntityInWorld($$newMob);
                         if (!$$pw.capabilities.$isCreativeMode) {
                             $$itemstack.$stackSize -= 1;
                         }
                     }
                 } catch(e) {
-                    console.warn("Spawn egg use failed for ${this.tags.id}:", e);
+                    console.warn("Spawn item use failed for ${this.tags.id}:", e);
                 }
             }
             return $$itemstack;
@@ -385,7 +547,7 @@ PRIMITIVES["mob"] = {
                 }
             }
         ));
-        ${hasEggTexture ? `
+        ${hasSpawnItemTexture ? `
         AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/textures/items/${eggId}.png", await (await fetch(
             $$itemTexture
         )).arrayBuffer());
