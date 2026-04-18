@@ -6,11 +6,8 @@ PRIMITIVES["mob"] = {
         id: "custom_mob",
         name: "Custom Mob",
 
-        // UI / grouping
-        category: "Mobs",
-
         // visuals
-        texture: VALUE_ENUMS.IMG, // main mob texture (entity)
+        texture: VALUE_ENUMS.IMG, // mob texture (entity)
         modelType: ["CHICKEN", "PIG", "COW", "SHEEP", "WOLF", "ZOMBIE", "SKELETON", "SPIDER"],
         width: 0.4,
         height: 0.7,
@@ -38,43 +35,32 @@ PRIMITIVES["mob"] = {
         breedingItem: "wheat",
         dropItem: "leather",
 
-        // egg colors (still used for EntityList mapping, but not for the visual model)
-        spawnEggBaseColor: 0x5e3e2d,
-        spawnEggSpotColor: 0x269166,
-
-        // custom spawn egg texture (base64 IMG) – treated like a normal item texture
-        spawnEggTexture: VALUE_ENUMS.IMG,
-
-        // spawning - comma separated list of biomes
-        // valid values: plains,desert,forest,taiga,swampland,river,beach,jungle
-        spawnInBiomes: "plains,forest,swampland,river,beach",
-        spawnWeight: 10,
-        spawnMinGroup: 2,
-        spawnMaxGroup: 4,
-
-        // sound keys (if left as "auto", they will be filled from modelType defaults)
-        livingSound: "auto",
-        hurtSound: "auto",
-        deathSound: "auto",
-        stepSound: "auto",
-        stepVolume: 0.15,
-
-        // audio files (base64) - optional overrides
-        idleAudioFile: VALUE_ENUMS.FILE,
-        hurtAudioFile: VALUE_ENUMS.FILE,
-        deathAudioFile: VALUE_ENUMS.FILE,
-        stepAudioFile: VALUE_ENUMS.FILE
+        // spawn egg as a NORMAL item
+        eggId: "custom_mob_spawn_egg",
+        eggName: "Custom Mob Spawn Egg",
+        eggTexture: VALUE_ENUMS.IMG, // item texture for the egg
+        eggMaxStackSize: 64,
+        eggCreativeTab: [
+            "tabMisc",
+            "tabBlock",
+            "tabDecorations",
+            "tabRedstone",
+            "tabTransport",
+            "tabAllSearch",
+            "tabFood",
+            "tabTools",
+            "tabCombat",
+            "tabBrewing",
+            "tabMaterials",
+            "tabInventory"
+        ]
     },
     getDependencies: function () {
         return [];
     },
     asJavaScript: function () {
         const hasTexture = this.tags.texture && typeof this.tags.texture === "string" && this.tags.texture.startsWith("data:");
-        const hasEggTexture = this.tags.spawnEggTexture && typeof this.tags.spawnEggTexture === "string" && this.tags.spawnEggTexture.startsWith("data:");
-        const hasIdleAudio = this.tags.idleAudioFile && typeof this.tags.idleAudioFile === "string" && this.tags.idleAudioFile.startsWith("data:");
-        const hasHurtAudio = this.tags.hurtAudioFile && typeof this.tags.hurtAudioFile === "string" && this.tags.hurtAudioFile.startsWith("data:");
-        const hasDeathAudio = this.tags.deathAudioFile && typeof this.tags.deathAudioFile === "string" && this.tags.deathAudioFile.startsWith("data:");
-        const hasStepAudio = this.tags.stepAudioFile && typeof this.tags.stepAudioFile === "string" && this.tags.stepAudioFile.startsWith("data:");
+        const hasEggTexture = this.tags.eggTexture && typeof this.tags.eggTexture === "string" && this.tags.eggTexture.startsWith("data:");
 
         const modelMapping = {
             "CHICKEN": "net.minecraft.client.model.ModelChicken",
@@ -87,85 +73,71 @@ PRIMITIVES["mob"] = {
             "SPIDER": "net.minecraft.client.model.ModelSpider"
         };
 
-        // vanilla default sounds per modelType
-        const defaultSounds = {
+        // vanilla-like sound keys for each model type
+        const soundMapping = {
             "CHICKEN": {
-                idle: "mob.chicken.say",
+                living: "mob.chicken.say",
                 hurt: "mob.chicken.hurt",
                 death: "mob.chicken.hurt",
-                step: "mob.chicken.step"
+                step: "mob.chicken.step",
+                stepVolume: 0.15
             },
             "PIG": {
-                idle: "mob.pig.say",
+                living: "mob.pig.say",
                 hurt: "mob.pig.say",
                 death: "mob.pig.death",
-                step: "mob.pig.step"
+                step: "mob.pig.step",
+                stepVolume: 0.15
             },
             "COW": {
-                idle: "mob.cow.say",
+                living: "mob.cow.say",
                 hurt: "mob.cow.hurt",
-                death: "mob.cow.death",
-                step: "mob.cow.step"
+                death: "mob.cow.hurt",
+                step: "mob.cow.step",
+                stepVolume: 0.15
             },
             "SHEEP": {
-                idle: "mob.sheep.say",
+                living: "mob.sheep.say",
                 hurt: "mob.sheep.say",
                 death: "mob.sheep.say",
-                step: "mob.sheep.step"
+                step: "mob.sheep.step",
+                stepVolume: 0.15
             },
             "WOLF": {
-                idle: "mob.wolf.bark",
+                living: "mob.wolf.bark",
                 hurt: "mob.wolf.hurt",
                 death: "mob.wolf.death",
-                step: "mob.wolf.step"
+                step: "mob.wolf.step",
+                stepVolume: 0.15
             },
             "ZOMBIE": {
-                idle: "mob.zombie.say",
+                living: "mob.zombie.say",
                 hurt: "mob.zombie.hurt",
                 death: "mob.zombie.death",
-                step: "mob.zombie.step"
+                step: "mob.zombie.step",
+                stepVolume: 0.15
             },
             "SKELETON": {
-                idle: "mob.skeleton.say",
+                living: "mob.skeleton.say",
                 hurt: "mob.skeleton.hurt",
                 death: "mob.skeleton.death",
-                step: "mob.skeleton.step"
+                step: "mob.skeleton.step",
+                stepVolume: 0.15
             },
             "SPIDER": {
-                idle: "mob.spider.say",
+                living: "mob.spider.say",
                 hurt: "mob.spider.say",
                 death: "mob.spider.death",
-                step: "mob.spider.step"
+                step: "mob.spider.step",
+                stepVolume: 0.15
             }
         };
 
-        const biomeMapping = {
-            "plains": "plains",
-            "desert": "desert",
-            "forest": "forest",
-            "taiga": "taiga",
-            "swampland": "swampland",
-            "river": "river",
-            "beach": "beach",
-            "jungle": "jungle"
-        };
-
         const modelClassId = modelMapping[this.tags.modelType] || "net.minecraft.client.model.ModelChicken";
+        const sounds = soundMapping[this.tags.modelType] || soundMapping["CHICKEN"];
 
-        // fill in auto sounds from modelType defaults
-        const soundDefaults = defaultSounds[this.tags.modelType] || defaultSounds["CHICKEN"];
-        const livingSoundKey = (this.tags.livingSound === "auto" ? soundDefaults.idle : this.tags.livingSound);
-        const hurtSoundKey = (this.tags.hurtSound === "auto" ? soundDefaults.hurt : this.tags.hurtSound);
-        const deathSoundKey = (this.tags.deathSound === "auto" ? soundDefaults.death : this.tags.deathSound);
-        const stepSoundKey = (this.tags.stepSound === "auto" ? soundDefaults.step : this.tags.stepSound);
-
-        // spawnInBiomes is stored as a comma-separated string
-        const spawnInBiomes = typeof this.tags.spawnInBiomes === "string"
-            ? this.tags.spawnInBiomes.split(",").map(s => s.trim()).filter(s => s.length > 0)
-            : [];
-
-        const eggId = this.tags.id + "_spawn_egg";
-        const eggName = this.tags.name + " Spawn Egg";
+        const eggId = this.tags.eggId || (this.tags.id + "_spawn_egg");
+        const eggName = this.tags.eggName || (this.tags.name + " Spawn Egg");
 
         return `(function CustomMobDatablock() {
     function waitForRenderManager() {
@@ -250,18 +222,19 @@ PRIMITIVES["mob"] = {
             ` : ''}
         };
 
+        // vanilla-like sounds for chosen model
         CustomEntity.prototype.$getLivingSound = function () {
-            return ModAPI.util.str("${livingSoundKey}");
+            return ModAPI.util.str("${sounds.living}");
         };
         CustomEntity.prototype.$getHurtSound = function () {
-            return ModAPI.util.str("${hurtSoundKey}");
+            return ModAPI.util.str("${sounds.hurt}");
         };
         CustomEntity.prototype.$getDeathSound = function () {
-            return ModAPI.util.str("${deathSoundKey}");
+            return ModAPI.util.str("${sounds.death}");
         };
         CustomEntity.prototype.$playStepSound = function () {
             this.wrapped = this.wrapped || ModAPI.util.wrap(this).getCorrective();
-            this.wrapped.playSound(ModAPI.util.str("${stepSoundKey}"), ${this.tags.stepVolume}, 1);
+            this.wrapped.playSound(ModAPI.util.str("${sounds.step}"), ${sounds.stepVolume}, 1);
         };
         CustomEntity.prototype.$getDropItem = function () {
             return (ModAPI.items["${this.tags.dropItem}"] || ModAPI.items.leather).getRef();
@@ -303,47 +276,11 @@ PRIMITIVES["mob"] = {
             .staticMethods.addMapping0.method(
                 ModAPI.util.asClass(CustomEntity),
                 { $createEntity: function (w) { return new CustomEntity(w); } },
-                ModAPI.util.str("${this.tags.name}"),
+                ModAPI.util.str("${this.tags.id}"),
                 ID,
-                ${this.tags.spawnEggBaseColor},
-                ${this.tags.spawnEggSpotColor}
+                0, // egg colors unused now
+                0
             );
-
-        // spawn placement
-        const SpawnPlacementType = ModAPI.reflect
-            .getClassById("net.minecraft.entity.EntityLiving$SpawnPlacementType")
-            .staticVariables;
-        const ENTITY_PLACEMENTS = ModAPI.util.wrap(
-            ModAPI.reflect
-                .getClassById("net.minecraft.entity.EntitySpawnPlacementRegistry")
-                .staticVariables.ENTITY_PLACEMENTS
-        );
-        ENTITY_PLACEMENTS.put(ModAPI.util.asClass(CustomEntity), SpawnPlacementType.ON_GROUND);
-
-        // biome spawning
-        ModAPI.addEventListener("bootstrap", () => {
-            const SpawnListEntry = ModAPI.reflect
-                .getClassById("net.minecraft.world.biome.BiomeGenBase$SpawnListEntry")
-                .constructors.find(x => x.length === 4);
-
-            ${spawnInBiomes.map(biome =>
-                biomeMapping[biome] ? `
-            const Biome_${biome} = ModAPI.util.wrap(
-                ModAPI.reflect
-                    .getClassById("net.minecraft.world.biome.BiomeGenBase")
-                    .staticVariables.${biomeMapping[biome]}
-            );
-            Biome_${biome}.spawnableCreatureList.add(
-                SpawnListEntry(
-                    ModAPI.util.asClass(CustomEntity),
-                    ${this.tags.spawnWeight},
-                    ${this.tags.spawnMinGroup},
-                    ${this.tags.spawnMaxGroup}
-                )
-            );
-            ` : ""
-            ).join("")}
-        });
 
         // localization key
         ModAPI.addEventListener("lib:asyncsink", () => {
@@ -372,54 +309,6 @@ PRIMITIVES["mob"] = {
 
         await waitForRenderManager();
 
-        ${hasIdleAudio ? `
-        try {
-            AsyncSink.setFile(
-                "resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/idle.ogg",
-                await (await fetch("${this.tags.idleAudioFile}")).arrayBuffer()
-            );
-            AsyncSink.Audio.register("${livingSoundKey}", AsyncSink.Audio.Category.ANIMALS, [
-                { path: "sounds/mob/${this.tags.id}/idle.ogg", pitch: 1, volume: 1, streaming: false }
-            ]);
-        } catch(e) {}
-        ` : ""}
-
-        ${hasHurtAudio ? `
-        try {
-            AsyncSink.setFile(
-                "resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/hurt.ogg",
-                await (await fetch("${this.tags.hurtAudioFile}")).arrayBuffer()
-            );
-            AsyncSink.Audio.register("${hurtSoundKey}", AsyncSink.Audio.Category.ANIMALS, [
-                { path: "sounds/mob/${this.tags.id}/hurt.ogg", pitch: 1, volume: 1, streaming: false }
-            ]);
-        } catch(e) {}
-        ` : ""}
-
-        ${hasDeathAudio ? `
-        try {
-            AsyncSink.setFile(
-                "resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/death.ogg",
-                await (await fetch("${this.tags.deathAudioFile}")).arrayBuffer()
-            );
-            AsyncSink.Audio.register("${deathSoundKey}", AsyncSink.Audio.Category.ANIMALS, [
-                { path: "sounds/mob/${this.tags.id}/death.ogg", pitch: 1, volume: 1, streaming: false }
-            ]);
-        } catch(e) {}
-        ` : ""}
-
-        ${hasStepAudio ? `
-        try {
-            AsyncSink.setFile(
-                "resourcepacks/AsyncSinkLib/assets/minecraft/sounds/mob/${this.tags.id}/step.ogg",
-                await (await fetch("${this.tags.stepAudioFile}")).arrayBuffer()
-            );
-            AsyncSink.Audio.register("${stepSoundKey}", AsyncSink.Audio.Category.ANIMALS, [
-                { path: "sounds/mob/${this.tags.id}/step.ogg", pitch: 1, volume: 1, streaming: false }
-            ]);
-        } catch(e) {}
-        ` : ""}
-
         try {
             ModAPI.mc.renderManager.entityRenderMap.put(
                 ModAPI.util.asClass(data.CustomEntity),
@@ -435,8 +324,9 @@ PRIMITIVES["mob"] = {
         }
     });
 })();
+
 (function SpawnEggDatablock() {
-    const $$eggTexture = "${this.tags.spawnEggTexture}";
+    const $$eggTexture = "${this.tags.eggTexture}";
 
     function $$ServersideItem() {
         const $$scoped_efb_globals = {};
@@ -445,6 +335,15 @@ PRIMITIVES["mob"] = {
 
         function $$CustomItem() {
             $$itemSuper(this);
+            // creative tab (same logic as items_creativetab)
+            var tabName = "${this.tags.eggCreativeTab}";
+            if (flags.target === "1_12") {
+                tabName = tabName.replace("tab", "").toUpperCase();
+            }
+            this.$setCreativeTab(
+                ModAPI.reflect.getClassById("net.minecraft.creativetab.CreativeTabs").staticVariables[tabName]
+            );
+            this.$maxStackSize = ${this.tags.eggMaxStackSize};
         }
         ModAPI.reflect.prototypeStack($$itemClass, $$CustomItem);
 
@@ -454,7 +353,7 @@ PRIMITIVES["mob"] = {
                     var $$newMob = ModAPI.reflect
                         .getClassById("net.minecraft.entity.EntityList")
                         .staticMethods.createEntityByName.method(
-                            ModAPI.util.str("${this.tags.name}"), $$world
+                            ModAPI.util.str("${this.tags.id}"), $$world
                         );
                     if ($$newMob) {
                         var $$pw = ModAPI.util.wrap($$player);
@@ -475,7 +374,11 @@ PRIMITIVES["mob"] = {
             var $$custom_item = (new $$CustomItem()).$setUnlocalizedName(
                 ModAPI.util.str("${eggId}")
             );
-            $$itemClass.staticMethods.registerItem.method(ModAPI.keygen.item("${eggId}"), ModAPI.util.str("${eggId}"), $$custom_item);
+            $$itemClass.staticMethods.registerItem.method(
+                ModAPI.keygen.item("${eggId}"),
+                ModAPI.util.str("${eggId}"),
+                $$custom_item
+            );
             ModAPI.items["${eggId}"] = $$custom_item;
             return $$custom_item;
         }
@@ -495,27 +398,22 @@ PRIMITIVES["mob"] = {
         });
         AsyncSink.L10N.set("item.${eggId}.name", "${eggName}");
 
-        // item-style spawn egg model (no vanilla spawn_egg tinting)
-        AsyncSink.setFile("resourcepacks/AsyncSinkLib/assets/minecraft/models/item/${eggId}.json", JSON.stringify(
-            {
+        AsyncSink.setFile(
+            "resourcepacks/AsyncSinkLib/assets/minecraft/models/item/${eggId}.json",
+            JSON.stringify({
                 "parent": "builtin/generated",
                 "textures": {
                     "layer0": "items/${eggId}"
-                },
-                "display": {
-                    "thirdperson": { "rotation": [-90, 0, 0], "translation": [0, 1, -3], "scale": [0.55, 0.55, 0.55] },
-                    "firstperson": { "rotation": [0, -135, 25], "translation": [0, 4, 2], "scale": [1.7, 1.7, 1.7] }
                 }
-            }
-        ));
+            })
+        );
 
-        // custom spawn egg texture as a normal item texture
-        if ($$eggTexture && $$eggTexture.indexOf("data:") === 0) {
-            AsyncSink.setFile(
-                "resourcepacks/AsyncSinkLib/assets/minecraft/textures/items/${eggId}.png",
-                await (await fetch($$eggTexture)).arrayBuffer()
-            );
-        }
+        ${hasEggTexture ? `
+        AsyncSink.setFile(
+            "resourcepacks/AsyncSinkLib/assets/minecraft/textures/items/${eggId}.png",
+            await (await fetch($$eggTexture)).arrayBuffer()
+        );
+        ` : ""}
     });
 })();`;
     }
