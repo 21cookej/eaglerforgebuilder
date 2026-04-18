@@ -5,54 +5,37 @@ PRIMITIVES["spear"] = {
     tags: {
         id: "custom_spear",
         name: "Spear",
-
-        // ONE texture for both item + thrown entity
-        texture: VALUE_ENUMS.IMG,   // 32×32 PNG
-
-        // Combat
-        attackDamage: 7.0,
-        throwDamage: 9.0,
-        maxDurability: 250,
-
-        // Throw physics
-        throwVelocity: 1.6,
-        throwInaccuracy: 0.01,
-        gravity: 0.05,
-        drag: 0.99,
-
-        // Pickup + despawn
-        stickInGroundTicks: 200,
-        canPickupCreativeOnly: false
+        // ONE 32×32 texture for both item + thrown entity
+        texture: VALUE_ENUMS.IMG
     },
 
     getDependencies: function () { return []; },
 
     asJavaScript: function () {
         const hasTexture = this.tags.texture && this.tags.texture.startsWith("data:");
-
         const id = this.tags.id;
         const name = this.tags.name;
 
-        const attackDamage = this.tags.attackDamage;
-        const throwDamage = this.tags.throwDamage;
-        const maxDurability = this.tags.maxDurability;
+        // hard‑coded stats (no extra tags so builder can’t complain)
+        const attackDamage = 7.0;
+        const throwDamage = 9.0;
+        const maxDurability = 250;
 
-        const throwVelocity = this.tags.throwVelocity;
-        const throwInaccuracy = this.tags.throwInaccuracy;
-        const gravity = this.tags.gravity;
-        const drag = this.tags.drag;
+        const throwVelocity = 1.6;
+        const throwInaccuracy = 0.01;
+        const gravity = 0.05;
+        const drag = 0.99;
 
-        const stickInGroundTicks = this.tags.stickInGroundTicks;
-        const canPickupCreativeOnly = this.tags.canPickupCreativeOnly;
+        const stickInGroundTicks = 200;
+        const canPickupCreativeOnly = false;
 
         return `(function SpearDatablock() {
 
     // ============================
-    // REGISTER ITEM
+    // ITEM
     // ============================
     function registerItem() {
         const Item = ModAPI.reflect.getClassById("net.minecraft.item.Item");
-        const ItemStack = ModAPI.reflect.getClassById("net.minecraft.item.ItemStack");
         const DamageSource = ModAPI.reflect.getClassById("net.minecraft.util.DamageSource");
 
         var superItem = ModAPI.reflect.getSuper(Item);
@@ -63,7 +46,7 @@ PRIMITIVES["spear"] = {
         };
         ModAPI.reflect.prototypeStack(Item, SpearItem);
 
-        // Melee hit
+        // melee
         SpearItem.prototype.$hitEntity = function (stack, target, attacker) {
             try {
                 var wrapT = ModAPI.util.wrap(target);
@@ -81,7 +64,7 @@ PRIMITIVES["spear"] = {
             return true;
         };
 
-        // Throw on right-click
+        // throw
         SpearItem.prototype.$onItemRightClick = function (stack, world, player) {
             var w = ModAPI.util.wrap(world);
             var p = ModAPI.util.wrap(player);
@@ -117,7 +100,7 @@ PRIMITIVES["spear"] = {
     }
 
     // ============================
-    // SPEAR ENTITY
+    // ENTITY
     // ============================
     function registerEntity() {
         const Entity = ModAPI.reflect.getClassById("net.minecraft.entity.Entity");
@@ -133,7 +116,7 @@ PRIMITIVES["spear"] = {
             this.inGround = false;
             this.ticksInGround = 0;
             this.thrower = thrower || null;
-            this.stack = stack ? stack : null;
+            this.stack = stack || null;
 
             if (thrower) {
                 var p = ModAPI.util.wrap(thrower);
@@ -239,7 +222,6 @@ PRIMITIVES["spear"] = {
                 var stack = this.stack
                     ? this.stack
                     : new ItemStack(registerItem.SpearItemRef, 1, 0);
-
                 this.wrapped.entityDropItem(stack, 0.1);
             } catch(e) {}
         };
@@ -253,14 +235,12 @@ PRIMITIVES["spear"] = {
             try {
                 var ItemStack = ModAPI.reflect.getClassById("net.minecraft.item.ItemStack");
                 var stack = new ItemStack(registerItem.SpearItemRef, 1, 0);
-
                 if (p.inventory.addItemStackToInventory(stack)) {
                     this.wrapped.$setDead();
                 }
             } catch(e) {}
         };
 
-        // Register entity
         var entId = ModAPI.keygen.entity("${id}_entity");
         ModAPI.reflect
             .getClassById("net.minecraft.entity.EntityList")
@@ -275,7 +255,7 @@ PRIMITIVES["spear"] = {
     }
 
     // ============================
-    // RENDERER (flat 2D sprite)
+    // RENDERER (flat sprite)
     // ============================
     function registerRenderer() {
         const Render = ModAPI.reflect.getClassById("net.minecraft.client.renderer.entity.Render");
@@ -335,7 +315,7 @@ PRIMITIVES["spear"] = {
     }
 
     // ============================
-    // EXECUTE REGISTRATION
+    // RUN
     // ============================
     ModAPI.dedicatedServer.appendCode(registerItem);
     ModAPI.dedicatedServer.appendCode(registerEntity);
@@ -343,9 +323,6 @@ PRIMITIVES["spear"] = {
     registerEntity();
     registerRenderer();
 
-    // ============================
-    // LOAD TEXTURE
-    // ============================
     ModAPI.addEventListener("lib:asyncsink", async () => {
         ${hasTexture ? `
         try {
